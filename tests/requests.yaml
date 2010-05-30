@@ -1,0 +1,182 @@
+---
+- description: Create a Container (CDMI Content Type)
+  method: PUT
+  path: /mydata
+  headers:
+    Accept: application/vnd.org.snia.cdmi.container+json
+    Content-Type: application/vnd.org.snia.cdmi.container+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "metadata": {
+        }
+    }
+  response: 201
+
+- description: Create a Container (Non-CDMI Content Type)
+  method: PUT
+  path: /mydata
+  response: 201
+
+- description: Read a Container Object (CDMI Content Type)
+  method: GET
+  path: /mydata
+  headers:
+    Accept: application/vnd.org.snia.cdmi.container+json
+    Content-Type: application/vnd.org.snia.cdmi.object+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
+- description: Read a Container Object (CDMI Content Type)
+  method: GET
+  path: /mydata?children:0-42
+  headers:
+    Accept: application/vnd.org.snia.cdmi.container+json
+    Content-Type: application/vnd.org.snia.cdmi.object+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
+- description: Read a Container Object (Non-CDMI Content Type)
+  method: GET
+  path: /mydata?parentURI
+  response: 200
+
+- description: Update a Container (CDMI Content Type)
+  method: PUT
+  path: /mydata
+  headers:
+    Accept: application/vnd.org.snia.cdmi.container+json
+    Content-Type: application/vnd.org.snia.cdmi.container+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "metadata": {
+            'creator': "Koen Bollen",
+            'tags': "test"
+        }
+    }
+  response: 200
+
+- description: Delete a Container Object (CDMI Content Type)
+  method: DELETE
+  path: /mydata
+  headers:
+    Accept: application/vnd.org.snia.cdmi.container+json
+    Content-Type: application/vnd.org.snia.cdmi.container+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
+- description: Delete a Container Object (Non-CDMI Content Type)
+  method: DELETE
+  path: /mydata
+  response: 200
+
+- description: Create a New Data Object (CDMI Content Type)
+  method: POST
+  path: /mydata/
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.dataobject+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "mimetype" : "text/plain",
+        "metadata" : {
+        },
+        "value" : "The cake is a lie!"
+    }
+  response: 201
+
+- description: Create a New Data Object (Non-CDMI Content Type)
+  method: POST
+  path: /mydata/
+  headers:
+    Content-Type: text/plain
+    Content-Length: 15
+  data: Koen was hier!!
+  response: 201
+
+
+- description: Create a Data Object (CDMI Content Type)
+  method: PUT
+  path: /mydata/hello.txt
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.dataobject+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "mimetype" : "text/plain",
+        "metadata" : {
+        },
+        "value" : "Hello, world!!\n"
+    }
+  response: 201
+
+- description: Create a Data Object (Non-CDMI Content Type)
+  method: PUT
+  path: /mydata/hello.txt
+  headers:
+    Content-Type: text/plain
+    Content-Length: 15
+  data: Hello, world!!\n
+  response: 201
+
+- description: Read a Data Object (CDMI Content Type)
+  method: GET
+  path: /mydata/hello.txt
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.object+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
+- description: Read a Data Object (Non-CDMI Content Type)
+  method: GET
+  path: /mydata/hello.txt
+  response: 200
+
+- description: Read a Data Object Fields (Non-CDMI Content Type)
+  method: GET
+  path: /mydata/hello.txt?objectID;metadata
+  response: 200
+
+- description: Update a Data Object (CDMI Content Type)
+  method: PUT
+  path: /mydata/hello.txt
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.dataobject+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "mimetype" : "text/plain",
+        "metadata" : {
+        },
+        "value" : "new value.."
+    }
+  response: 201
+
+- description: Update a Data Object (Non-CDMI Content Type)
+  method: PUT
+  path: /mydata/hello.txt
+  headers:
+    Content-Type: text/plain
+    Content-Length: 5
+  data: sup?\n
+  response: 201
+
+- description: Delete a Data Object (CDMI Content Type)
+  method: DELETE
+  path: /mydata/hello.txt
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.dataobject+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
+- description: Delete a Data Object (Non-CDMI Content Type)
+  method: DELETE
+  path: /mydata/hello.txt
+  response: 200
+
