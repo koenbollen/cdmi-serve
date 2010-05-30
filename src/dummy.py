@@ -4,13 +4,17 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 
 import cdmi
+import io as _io
+import metadata as _metadata
 
 class CDMIServer( HTTPServer ):
     debug = False
     allow_reuse_address = True
 
-    def __init__(self, address, handler ):
+    def __init__(self, address, handler, io, metadata ):
         HTTPServer.__init__(self, address, handler )
+        self.io = io
+        self.metadata = metadata
 
 class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
@@ -36,8 +40,14 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
 
     def cdmi_handle(self ):
+        io = self.server.io
+        metadata = self.server.metadata
         method = self.request.method
         path = self.request.path
+
+        if method == "get":
+            if not io.exists( path ):
+                return self.send_error( 404 )
 
         content = repr(self.request) + "\r\n"
 
@@ -69,7 +79,11 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         self.wfile.close()
 
 def test(): # dev main only
-    s = CDMIServer( ('',2364), CDMIRequestHandler )
+    s = CDMIServer(
+            ('',2364), CDMIRequestHandler,
+            _io.IO( "data/" ),
+            _metadata.Access( "sqlite3", "data.db" )
+        )
     s.debug = True
     try:
         s.serve_forever()
