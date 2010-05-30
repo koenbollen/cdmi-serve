@@ -2,6 +2,12 @@
 # Koen Bollen <meneer@koenbollen.nl>
 # 2010 GPL
 
+try:
+    import json
+except ImportError:
+    import simplejson as json
+
+
 SPECIFICATION_VERSION = 1.0
 
 httpstatuscodes = [
@@ -46,7 +52,7 @@ mimetypes = {
 class CDMIError( Exception ):
     pass
 
-class CDMIProtocolError( CDMIError ):
+class ProtocolError( CDMIError ):
     def __init__(self, message, cause ):
         self.message = message
         self.cause = cause
@@ -67,16 +73,23 @@ class Request( object ):
         self.cdmi = None
         self.objecttype = "unknown"
         self.source = None
+        self.rawdata = None
         self.json = None
 
         self.__validate()
         self.__parse()
 
+        # states:
+        self.__validated = False
+        self.__parsed = False
+        self.__read = False
+
     def __validate(self ):
         if self.method not in ("get", "post", "put", "delete"):
-            raise CDMIProtocolError( "invalid method:", self.method )
+            raise ProtocolError( "invalid method:", self.method )
         if self.path[0] != '/':
-            raise CDMIProtocolError( "invalid path", self.path )
+            raise ProtocolError( "invalid path", self.path )
+        self.__validated = True
 
     def __parse(self ):
         h = self.headers
@@ -88,7 +101,7 @@ class Request( object ):
                 if float(spec) < SPECIFICATION_VERSION:
                     raise ValueError
             except ValueError:
-                raise CDMIProtocolError( "incorrect version", spec )
+                raise ProtocolError( "incorrect cdmi version", spec )
 
             try:
                 accept = h['Accept']
@@ -96,7 +109,7 @@ class Request( object ):
             except KeyError, e:
                 # One exception, a GET request without a type:
                 if not (e.args[0].lower() == "accept" and self.method=="get"):
-                    raise CDMIProtocolError( "missing header", str(e) )
+                    raise ProtocolError( "missing header", str(e) )
                 accept = None
 
             for objecttype, mime in mimetypes.items():
@@ -133,14 +146,57 @@ class Request( object ):
                     v = v.strip()
                 self.fields[k.strip().lower()] = v
 
+        self.__parsed = True
+
     def __repr__(self ):
         tmpl = "<cdmi request: {cdmi} {method} a {objecttype}: '{path}'>"
         values = vars(self)
         values['cdmi'] = self.cdmi and "cdmi" or "non-cdmi"
         return tmpl.format( **values )
 
+    @property
+    def expects(self ):
+        """
+        Return True if this request expects/requires to read data to finish
+        it's request parsing.
+
+        True if:
+         - Not yet read.
+         - is cdmi type request
+         - is not a get/read request
+        """
+        return not self.__read and self.cdmi and self.method != "get"
+
     def read(self, fp ):
-        pass
+        try:
+            length = self.headers['Content-Length']
+            length = int(length)
+        except KeyError:
+            length = None
+        except ValueError:
+            raise ProtocolError( "invalid Content-Length", length )
+        self.rawdata = fp.read(length)
+
+        if self.contenttype=="text/json" or self.contenttype.endswith("+json"):
+            try:
+                self.json = json.loads( self.rawdata )
+            except ValueError, e:
+                raise ProtocolError( "unable to parse json", e )
+
+        self.__read = True
+
+    def phase2(self ):
+        if not self.cdmi and self.contenttype:
+            self.source = ( "rawdata", None )
+        elif self.cdmi and self.method in ("post", "put"):
+            if not self.json:
+                raise ProtocolError( "missing json payload" )
+            for k in ("value", "copy", "move", "reference"):
+                if k in self.json:
+                    self.source = ( k, self.json[k] )
+                    break
+
+
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:
 

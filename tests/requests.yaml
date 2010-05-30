@@ -51,8 +51,8 @@
   data: |
     {
         "metadata": {
-            'creator': "Koen Bollen",
-            'tags': "test"
+            "creator": "Koen Bollen",
+            "tags": "test"
         }
     }
   response: 200

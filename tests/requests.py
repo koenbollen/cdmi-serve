@@ -3,6 +3,7 @@
 # 2010 GPL
 
 import os
+from StringIO import StringIO
 import yaml
 
 import cdmi
@@ -15,9 +16,19 @@ def main():
 
         headers = req.get( "headers", {} )
         headers['Host'] = "localhost"
+
+        data = req.get( "data" )
+        if data:
+            data = data.strip()+"\n"
+            data = data.replace( "\r", "" ).replace( "\n", "\r\n" )
+            headers['Content-Length'] = len(data)
         res = cdmi.Request( req['method'], req['path'], headers )
-        print res, res.fields
+        if res.expects and data:
+            res.read( StringIO( data ) )
+        res.phase2()
+        print res, res.fields, res.source
         print
+
 
 if __name__ == "__main__":
     main()
