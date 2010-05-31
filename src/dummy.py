@@ -23,9 +23,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
         try:
             self.request = cdmi.Request( self.command, self.path, self.headers )
-            if self.request.expects:
-                self.request.read( self.rfile )
-            self.request.phase2()
+            self.request.read( self.rfile )
         except cdmi.ProtocolError, e:
             return self.send_error( 400, e )
 
@@ -92,13 +90,13 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
         self.send_response( code, message )
         self.send_default_headers()
-        self.close_connection = 1
-        self.send_header( "Connection", "close" )
+        if code >= 500:
+            self.send_header( "Connection", "close" )
+            self.close_connection = 1
         self.send_header( "Content-Type", "text/plain" )
         self.send_header( "Content-Length", len(content) )
         self.end_headers()
         self.wfile.write( content )
-        self.wfile.close()
 
 
 def test(): # dev main only

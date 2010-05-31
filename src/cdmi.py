@@ -157,41 +157,30 @@ class Request( object ):
         values['cdmi'] = self.cdmi and "cdmi" or "non-cdmi"
         return tmpl.format( **values )
 
-    @property
-    def expects(self ):
-        """
-        Return True if this request expects/requires to read data to finish
-        it's request parsing.
-
-        True if:
-         - Not yet read.
-         - is cdmi type request
-         - is not a get/read request
-         - is not a delete request
-        """
-        if self.__read:
-            return False
-        return self.cdmi and self.method not in ("get","delete")
-
     def read(self, fp ):
-        try:
-            length = self.headers['Content-Length']
-            length = int(length)
-        except KeyError:
-            length = None
-        except ValueError:
-            raise ProtocolError( "invalid Content-Length", length )
-        self.rawdata = fp.read(length)
+        if self.__read:
+            return
 
-        if self.contenttype=="text/json" or self.contenttype.endswith("+json"):
+        self.fp = fp
+
+        if self.cdmi and self.method not in ("get","delete"):
+
             try:
-                self.json = json.loads( self.rawdata )
-            except ValueError, e:
-                raise ProtocolError( "unable to parse json", e )
+                length = self.headers['Content-Length']
+                length = int(length)
+            except KeyError:
+                length = None
+            except ValueError:
+                raise ProtocolError( "invalid Content-Length", length )
+            self.rawdata = fp.read(length)
 
-        self.__read = True
+            if self.contenttype=="text/json" or self.contenttype.endswith("+json"):
+                try:
+                    self.json = json.loads( self.rawdata )
+                except ValueError, e:
+                    raise ProtocolError( "unable to parse json", e )
 
-    def phase2(self ):
+
         if not self.cdmi and self.contenttype:
             self.source = ( "rawdata", None )
         elif self.cdmi and self.method in ("post", "put"):
@@ -202,6 +191,7 @@ class Request( object ):
                     self.source = ( k, self.json[k] )
                     break
 
+        self.__read = True
 
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:
