@@ -109,7 +109,7 @@
         "mimetype" : "text/plain",
         "metadata" : {
         },
-        "value" : "Hello, world!!\n"
+        "value" : "Hello, world!!"
     }
   response: 201
 
@@ -118,8 +118,8 @@
   path: /mydata/hello.txt
   headers:
     Content-Type: text/plain
-    Content-Length: 15
-  data: Hello, world!!\n
+    Content-Length: 14
+  data: Hello, world!!
   response: 201
 
 - description: Read a Data Object (CDMI Content Type)
@@ -162,8 +162,8 @@
   path: /mydata/hello.txt
   headers:
     Content-Type: text/plain
-    Content-Length: 5
-  data: sup?\n
+    Content-Length: 6
+  data: sup?
   response: 201
 
 - description: Delete a Data Object (CDMI Content Type)

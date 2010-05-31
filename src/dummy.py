@@ -5,16 +5,14 @@ from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 
 import cdmi
 import io as _io
-import metadata as _metadata
 
 class CDMIServer( HTTPServer ):
     debug = False
     allow_reuse_address = True
 
-    def __init__(self, address, handler, io, metadata ):
+    def __init__(self, address, handler, io ):
         HTTPServer.__init__(self, address, handler )
         self.io = io
-        self.metadata = metadata
 
 class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
@@ -40,16 +38,40 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
 
     def cdmi_handle(self ):
+
+        # This suppose to speed things up:
         io = self.server.io
-        metadata = self.server.metadata
+        iscdmi = self.request.cdmi
         method = self.request.method
         path = self.request.path
 
-        if method == "get":
+        # The only possibility that the objecttype is
+        # unknown is on a non-cdmi request for reading
+        # or deleting a dataobject or container:
+        if not iscdmi and method in ("get", "delete"):
             if not io.exists( path ):
                 return self.send_error( 404 )
+            if self.request.objecttype == "unknown":
+                self.request.objecttype = io.objecttype( path)
 
-        content = repr(self.request) + "\r\n"
+        assert self.request.objecttype != "unknown"
+
+        mname = method+"_"+self.request.objecttype
+
+        # tmp test, i'll read rawdata as next request otherwise:
+        rawdata = None
+        if self.request.source and self.request.source[0] == "rawdata":
+            try:
+                length = self.request.headers['Content-Length']
+                length = int(length)
+            except KeyError:
+                length = None
+            rawdata = self.rfile.read(length)
+            self.request.source = ("rawdata", rawdata)
+
+        content  = repr(self.request) + "\r\n"
+        content += "methodname: "+mname+"\r\n"
+        content += "source: "+repr(self.request.source)+"\r\n"
 
         self.send_response( 200 )
         self.send_default_headers()
@@ -57,11 +79,11 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         self.send_header( "Content-Length", len(content) )
         self.end_headers()
         self.wfile.write( content )
-        self.wfile.close()
 
 
     def send_default_headers(self ):
         self.send_header( "X-Author", "Koen Bollen" )
+
 
     def send_error(self, code, message=None ):
         if not message or not self.server.debug:
@@ -78,11 +100,11 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         self.wfile.write( content )
         self.wfile.close()
 
+
 def test(): # dev main only
     s = CDMIServer(
             ('',2364), CDMIRequestHandler,
-            _io.IO( "data/" ),
-            _metadata.Access( "sqlite3", "data.db" )
+            _io.IO( "data/" )
         )
     s.debug = True
     try:

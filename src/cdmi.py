@@ -9,6 +9,7 @@ except ImportError:
 
 
 SPECIFICATION_VERSION = 1.0
+DEFAULT_PORT = 2364
 
 httpstatuscodes = [
     ( 200, "OK",
@@ -76,13 +77,14 @@ class Request( object ):
         self.rawdata = None
         self.json = None
 
-        self.__validate()
-        self.__parse()
-
         # states:
         self.__validated = False
         self.__parsed = False
         self.__read = False
+
+        self.__validate()
+        self.__parse()
+
 
     def __validate(self ):
         if self.method not in ("get", "post", "put", "delete"):
@@ -90,6 +92,7 @@ class Request( object ):
         if self.path[0] != '/':
             raise ProtocolError( "invalid path", self.path )
         self.__validated = True
+
 
     def __parse(self ):
         h = self.headers
@@ -164,8 +167,11 @@ class Request( object ):
          - Not yet read.
          - is cdmi type request
          - is not a get/read request
+         - is not a delete request
         """
-        return not self.__read and self.cdmi and self.method != "get"
+        if self.__read:
+            return False
+        return self.cdmi and self.method not in ("get","delete")
 
     def read(self, fp ):
         try:
