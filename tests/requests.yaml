@@ -42,7 +42,7 @@
 
 - description: Read a range of children from a Container Object (CDMI Content Type)
   method: GET
-  path: /mydata?children:0-42
+  path: /mydata?children:2-4;childrenrange
   headers:
     Accept: application/vnd.org.snia.cdmi.container+json
     Content-Type: application/vnd.org.snia.cdmi.object+json

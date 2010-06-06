@@ -35,11 +35,14 @@ class IO( object ):
             return "dataobject"
         return "unknown"
 
+    def stat(self, path ):
+        return os.stat( self.resolve( path ) )
+
     def mkdir(self, path ):
         return os.mkdir( self.resolve( path ) )
 
-    def stat(self, path ):
-        return os.stat( self.resolve( path ) )
+    def rmdir(self, path ):
+        return os.rmdir( self.resolve( path ) )
 
     def list(self, path ):
         path = self.resolve( path )

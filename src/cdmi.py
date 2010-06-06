@@ -230,7 +230,10 @@ class Request( object ):
 
     def container(self ):
         if "children" in self.fields and self.fields['children'] is not None:
-            range = [int(p) for p in self.fields['children'].split("-")]
+            try:
+                range = [int(p) for p in self.fields['children'].split("-")]
+            except ValueError:
+                raise ProtocolError( "invalid children range", self.fields['children'] )
             range = (range + [None]*2)[:2]
             if range[1] is not None:
                 range[1] += 1
@@ -239,9 +242,9 @@ class Request( object ):
 
 class Handler( object ):
 
-    def __init__(self, io, request ):
-        self.io = io
+    def __init__(self, request, io ):
         self.request = request
+        self.io = io
         self.target = io.buildtarget( self.request.path )
 
     def put_container(self ):
@@ -283,7 +286,56 @@ class Handler( object ):
                     'children': children,
                 }
 
-        return ( 201, reply )
+        return ( (201,"Created"), reply )
+
+    def get_container(self ):
+        target = self.target
+        try:
+            children = target.list()
+        except OSError, e:
+            raise OperationError( 500, "unable to list directory", e )
+        childrenrange = "0-%d" % len(children)
+        if self.request.range:
+            s, e = self.request.range
+            if s is None or s < 0:
+                s = 0;
+            if e is None or e > len(children)-1:
+                e = len(children)-1
+            childrenrange = "%d-%d" % (s,e+1-s) # remember? inclusive endpoint
+            children = children[s:e]
+
+        # load user metadata here
+
+        reply = {
+                'objectID': util.objectid( self.request.path ),
+                'objectURI': self.request.path,
+                'parentURI': target.parent(),
+                'completionStatus': "Complete",
+                #'metadata': {},
+                'childrenrange': childrenrange,
+                'children': children,
+            }
+        if len(self.request.fields) > 0:
+            fields = self.request.fields
+            for key in reply.keys():
+                if key.lower() not in fields:
+                    del reply[key]
+        return ( (200,), reply )
+
+    def delete_container(self ):
+        target = self.target
+        try:
+            target.rmdir()
+        except OSError, e:
+            httpcode = 500
+            if e.errno == 2:
+                httpcode = 404
+            if e.errno == 39:
+                httpcode = 409
+            raise OperationError( httpcode, "unable to remove directory", e );
+
+        return ( (200,), None )
+
 
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:
