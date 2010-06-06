@@ -1,7 +1,6 @@
 # Koen Bollen <meneer koenbollen nl>
 # 2010 GPL
 
-from cdmi import ENTERPRISE_NUMBER
 from uuid import uuid1 as uuid
 import base64
 import re
@@ -14,7 +13,7 @@ def objectid( opaque=None ):
     else:
         opaque = str(opaque)
     length = 8+len(opaque)
-    rawr = struct.pack( "!IxBH%ds" % len(opaque), ENTERPRISE_NUMBER, length, 0, opaque )
+    rawr = struct.pack( "!IxBH%ds" % len(opaque), 20846, length, 0, opaque )
     assert len(rawr) == length
     csum = CRC16()
     csum.update( rawr )

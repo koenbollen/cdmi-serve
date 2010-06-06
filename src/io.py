@@ -9,10 +9,13 @@ import os
 
 from functools import wraps
 
+DEFAULT_BUFSIZE = 64*1024
+
 class IO( object ):
 
-    def __init__(self, root="./" ):
+    def __init__(self, root="./", bufsize=DEFAULT_BUFSIZE ):
         self.root = root
+        self.bufsize = bufsize
 
     def buildtarget(self, path ):
         return _Wrapper( self, path )
@@ -52,6 +55,34 @@ class IO( object ):
                 ls[i] += "/"
         return ls
 
+    def write(self, path, fp, length, range=None ):
+        # important locking point.
+
+        givenlength = length
+        if range is not None and None not in range:
+            length = min( length, range[1]-range[0] )
+
+        if range is None or not self.exists(path):
+            mode = "wb"
+        else:
+            mode = "r+b"
+        out = open( self.resolve( path ), mode, self.bufsize )
+        out.seek(0, os.SEEK_SET)
+        if range is not None and range[0]:
+            out.seek( range[0], os.SEEK_SET )
+
+        nbytes = 0
+        while nbytes < length:
+            chunk = fp.read( min( length, self.bufsize ) )
+            if not chunk:
+                break
+            out.write( chunk )
+            nbytes += len(chunk)
+
+        out.close()
+
+        if givenlength != length:
+            fp.read( givenlength - length )
 
 class _Wrapper( object ):
     def __init__(self, io, path ):
@@ -59,7 +90,7 @@ class _Wrapper( object ):
         self.path = path
 
     def __getattr__(self, name ):
-        # FEATURE: Cache here.
+        # FEATURE: Cache here, object bound.
         mthd = getattr( self.io, name )
         @wraps( mthd )
         def wrapper( *args, **kwargs ):

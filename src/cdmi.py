@@ -1,10 +1,10 @@
 # Koen Bollen <meneer@koenbollen.nl>
 # 2010 GPL
 
-ENTERPRISE_NUMBER = 20846
 SPECIFICATION_VERSION = 1.0
 DEFAULT_PORT = 2364
 
+from StringIO import StringIO
 try:
     import json
 except ImportError:
@@ -60,7 +60,9 @@ class ProtocolError( CDMIError ):
         self.cause = cause
 
     def __str__(self ):
-        return "%s: %r" % (self.message, self.cause)
+        if self.cause:
+            return "%s: %r" % (self.message, self.cause)
+        return self.message
 
     def __repr__(self ):
         return "<CDMI.ProtocolError %s>" % (str(self))
@@ -202,7 +204,14 @@ class Request( object ):
 
 
         if not self.cdmi and self.contenttype:
-            self.source = ( "rawdata", None )
+            try:
+                length = self.headers['Content-Length']
+                length = int(length)
+            except KeyError:
+                raise ProtocolError( "missing Content-Length" )
+            except ValueError:
+                raise ProtocolError( "invalid Content-Length", length )
+            self.source = ( "rawdata", length )
         elif self.cdmi and self.method in ("post", "put"):
             if self.json is None:
                 raise ProtocolError( "missing json payload" )
@@ -226,7 +235,7 @@ class Request( object ):
         if rangestr is not None:
             self.range = util.byterange( rangestr )
         else:
-            self.range = (None, None)
+            self.range = None
 
     def container(self ):
         if "children" in self.fields and self.fields['children'] is not None:
@@ -257,7 +266,9 @@ class Handler( object ):
             if target.objecttype() != "container" or noclobber:
                 raise OperationError( 409, "path exists" )
 
-        # TODO: Accept move and copy.
+        stype = self.request.source[0]
+        if stype in ("move","copy","reference"):
+            raise OperationError( 501, "not yet implemented", stype )
 
         try:
             target.mkdir()
@@ -311,7 +322,7 @@ class Handler( object ):
                 'objectURI': self.request.path,
                 'parentURI': target.parent(),
                 'completionStatus': "Complete",
-                #'metadata': {},
+                'metadata': {},
                 'childrenrange': childrenrange,
                 'children': children,
             }
@@ -335,6 +346,58 @@ class Handler( object ):
             raise OperationError( httpcode, "unable to remove directory", e );
 
         return ( (200,), None )
+
+    def put_dataobject(self ):
+        target = self.target
+        stype, source = self.request.source
+
+        noclobber = self.request.headers.get("X-CDMI-NoClobber", "false") # TEST
+        noclobber = noclobber.strip().lower() in ("true","yes","1")
+
+        if target.exists():
+            if target.objecttype() != "dataobject" or noclobber:
+                raise OperationError( 409, "path exists" )
+
+        if stype in ("value", "rawdata"):
+
+            if stype == "value":
+                fp = StringIO( source )
+                length = len(source)
+            else:
+                fp = self.request.fp
+                length = source
+
+            range = self.request.range
+            try:
+                target.write( fp, length, range )
+            except (OSError, IOError), e:
+                httpcode = 500
+                if e.errno == 2:
+                    httpcode = 404
+                elif e.errno == 28:
+                    httpcode = 504
+                raise OperationError( httpcode, "unable to write to file", e )
+
+        elif stype in ("move","copy","reference"):
+            raise OperationError( 501, "not yet implemented", stype)
+
+        reply = None
+        if self.request.cdmi:
+            reply = {
+                    'objectID': util.objectid( self.request.path ),
+                    'objectURI': self.request.path,
+                    'parentURI': target.parent(),
+                    'mimetype': "application/octet-stream",
+                    'metadata': {},
+                    'completionStatus': "Complete",
+                }
+        return ( (201,), reply )
+
+    def get_dataobject(self ):
+        pass
+
+    def delete_dataobject(self ):
+        pass
 
 
 

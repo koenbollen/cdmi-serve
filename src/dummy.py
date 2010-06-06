@@ -45,25 +45,29 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         iscdmi = self.request.cdmi
         method = self.request.method
         path = self.request.path
+        headers = self.request.headers
+        objecttype = self.request.objecttype
 
         # The only possibility that the objecttype is
         # unknown is on a non-cdmi request for reading
         # or deleting a dataobject or container:
         if not iscdmi and method in ("get", "delete"):
-            if not io.exists( path ):
-                return self.send_error( 404 )
-            if self.request.objecttype == "unknown":
-                self.request.objecttype = io.objecttype( path)
+            if objecttype == "unknown":
+                if not io.exists( path ):
+                    return self.send_error( 404 )
+                if objecttype == "unknown":
+                    self.request.objecttype = io.objecttype( path)
+                    objecttype = self.request.objecttype
 
-        assert self.request.objecttype != "unknown"
+        assert objecttype != "unknown"
 
         # Loose checks:
         if not iscdmi and method=="get":
-            if self.request.objecttype=="container" and len(self.request.fields) == 0:
+            if objecttype=="container" and len(self.request.fields) == 0:
                 return self.send_error( 400, "missing fields" )
 
         try:
-            typemthd = getattr( self.request, self.request.objecttype )
+            typemthd = getattr( self.request, objecttype )
         except AttributeError:
             pass
         else:
@@ -72,7 +76,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             except cdmi.ProtocolError, e:
                 return self.send_error( 400, e )
 
-        mname = method+"_"+self.request.objecttype
+        mname = method+"_"+objecttype
 
         handler = cdmi.Handler( self.request, io )
         try:
@@ -93,7 +97,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                 self.send_default_headers()
                 self.end_headers()
             else:
-                mimetype = cdmi.mimetypes[self.request.objecttype]
+                mimetype = cdmi.mimetypes[objecttype]
                 data = json.dumps( res[1] ).rstrip() + "\r\n"
                 self.send_response( *res[0] )
                 self.send_default_headers()
