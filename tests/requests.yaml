@@ -13,6 +13,19 @@
     }
   response: 201
 
+- description: Move a Container (CDMI Content Type)
+  method: PUT
+  path: /mydata_newpath
+  headers:
+    Accept: application/vnd.org.snia.cdmi.container+json
+    Content-Type: application/vnd.org.snia.cdmi.container+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "move": "/mydata"
+    }
+  response: 201
+
 - description: Create a Container (Non-CDMI Content Type)
   method: PUT
   path: /mydata

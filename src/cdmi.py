@@ -1,6 +1,9 @@
-#!/usr/bin/env python
 # Koen Bollen <meneer@koenbollen.nl>
 # 2010 GPL
+
+ENTERPRISE_NUMBER = 20846
+SPECIFICATION_VERSION = 1.0
+DEFAULT_PORT = 2364
 
 try:
     import json
@@ -8,10 +11,6 @@ except ImportError:
     import simplejson as json
 
 import util
-
-
-SPECIFICATION_VERSION = 1.0
-DEFAULT_PORT = 2364
 
 httpstatuscodes = [
     ( 200, "OK",
@@ -56,7 +55,7 @@ class CDMIError( Exception ):
     pass
 
 class ProtocolError( CDMIError ):
-    def __init__(self, message, cause ):
+    def __init__(self, message, cause=None ):
         self.message = message
         self.cause = cause
 
@@ -64,7 +63,22 @@ class ProtocolError( CDMIError ):
         return "%s: %r" % (self.message, self.cause)
 
     def __repr__(self ):
-        return "<CDMIProtocolError %s>" % (str(self))
+        return "<CDMI.ProtocolError %s>" % (str(self))
+
+class OperationError( CDMIError ):
+
+    def __init__(self, httpcode, message, cause=None ):
+        self.httpcode = httpcode
+        self.message = message
+        self.cause = cause
+
+    def __str__(self ):
+        if self.cause:
+            return "%s (%d): %r" % (self.message, self.httpcode, self.cause )
+        return "%s (%d)" % (self.message, self.httpcode )
+
+    def __repr__(self ):
+        return "<CDMI.OperationError %s>" % (str(self))
 
 class Request( object ):
 
@@ -184,13 +198,13 @@ class Request( object ):
                 try:
                     self.json = json.loads( self.rawdata )
                 except ValueError, e:
-                    raise ProtocolError( "unable to parse json", e )
+                    raise ProtocolError( "unable to parse json", e.args[0] )
 
 
         if not self.cdmi and self.contenttype:
             self.source = ( "rawdata", None )
         elif self.cdmi and self.method in ("post", "put"):
-            if not self.json:
+            if self.json is None:
                 raise ProtocolError( "missing json payload" )
             for k in ("value", "copy", "move", "reference"):
                 if k in self.json:
@@ -215,13 +229,61 @@ class Request( object ):
             self.range = (None, None)
 
     def container(self ):
-
         if "children" in self.fields and self.fields['children'] is not None:
             range = [int(p) for p in self.fields['children'].split("-")]
             range = (range + [None]*2)[:2]
             if range[1] is not None:
                 range[1] += 1
             self.range = tuple(range)
+
+
+class Handler( object ):
+
+    def __init__(self, io, request ):
+        self.io = io
+        self.request = request
+        self.target = io.buildtarget( self.request.path )
+
+    def put_container(self ):
+        target = self.target
+
+        noclobber = self.request.headers.get("X-CDMI-NoClobber", "false") # TEST
+        noclobber = noclobber.strip().lower() in ("true","yes","1")
+
+        if target.exists():
+            if target.objecttype() != "container" or noclobber:
+                raise OperationError( 409, "path exists" )
+
+        # TODO: Accept move and copy.
+
+        try:
+            target.mkdir()
+        except OSError, e:
+            httpcode = 500
+            if e.errno == 2:
+                httpcode = 404
+            if e.errno != 17 and not noclobber: # File exists
+                raise OperationError( httpcode, "unable to create directory", e );
+
+        # save user metadata here
+
+        reply = None
+        if self.request.cdmi:
+            try:
+                children = target.list()
+            except OSError: # doesnt happen
+                children = []
+            reply = {
+                    'objectID': util.objectid( self.request.path ),
+                    'objectURI': self.request.path,
+                    'parentURI': target.parent(),
+                    'completionStatus': "Complete",
+                    #'metadata': {},
+                    'childrenrange': "0-%d" % len(children),
+                    'children': children,
+                }
+
+        return ( 201, reply )
 
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:

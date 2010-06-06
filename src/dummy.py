@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-#
+# Koen Bollen <meneer koenbollen nl>
+# 2010 GPL
 
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 
@@ -61,6 +61,19 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             pass
 
         mname = method+"_"+self.request.objecttype
+
+        handler = cdmi.Handler( io, self.request )
+        try:
+            mthd = getattr( handler, mname )
+        except AttributeError, e:
+            return self.send_error(
+                    501,
+                    "Method 'cdmi.Handler.%s' not implemented" % mname
+                )
+        try:
+            res = mthd()
+        except cdmi.OperationError, e:
+            return self.send_error( e.httpcode, e.message )
 
         # tmp test, i'll read rawdata as next request otherwise:
         rawdata = None
