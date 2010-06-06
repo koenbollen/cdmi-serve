@@ -54,6 +54,12 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
         assert self.request.objecttype != "unknown"
 
+        try:
+            typemthd = getattr( self.request, self.request.objecttype )
+            typemthd()
+        except AttributeError:
+            pass
+
         mname = method+"_"+self.request.objecttype
 
         # tmp test, i'll read rawdata as next request otherwise:
@@ -70,6 +76,8 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         content  = repr(self.request) + "\r\n"
         content += "methodname: "+mname+"\r\n"
         content += "source: "+repr(self.request.source)+"\r\n"
+        if self.request.range:
+            content += "range:"+repr(self.request.range)+"\r\n"
 
         self.send_response( 200 )
         self.send_default_headers()

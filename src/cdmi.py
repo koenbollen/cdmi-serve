@@ -7,6 +7,8 @@ try:
 except ImportError:
     import simplejson as json
 
+import util
+
 
 SPECIFICATION_VERSION = 1.0
 DEFAULT_PORT = 2364
@@ -76,6 +78,7 @@ class Request( object ):
         self.source = None
         self.rawdata = None
         self.json = None
+        self.range = None
 
         # states:
         self.__validated = False
@@ -139,6 +142,7 @@ class Request( object ):
             else:
                 self.objecttype = "unknown"
 
+        # Separate fields from the path:
         p = self.path
         self.fields = {}
         if "?" in self.path:
@@ -158,11 +162,13 @@ class Request( object ):
         return tmpl.format( **values )
 
     def read(self, fp ):
+        """Read and parse request payload."""
         if self.__read:
             return
 
         self.fp = fp
 
+        # Read json payload if needed:
         if self.cdmi and self.method not in ("get","delete"):
 
             try:
@@ -192,6 +198,30 @@ class Request( object ):
                     break
 
         self.__read = True
+
+    def dataobject(self ):
+        rangestr = None
+
+        if self.cdmi:
+            if "value" in self.fields and self.fields['value'] is not None:
+                rangestr = "bytes=" + self.fields['value']
+        else:
+            if "Content-Range" in self.headers:
+                rangestr = self.headers['Content-Range']
+
+        if rangestr is not None:
+            self.range = util.byterange( rangestr )
+        else:
+            self.range = (None, None)
+
+    def container(self ):
+
+        if "children" in self.fields and self.fields['children'] is not None:
+            range = [int(p) for p in self.fields['children'].split("-")]
+            range = (range + [None]*2)[:2]
+            if range[1] is not None:
+                range[1] += 1
+            self.range = tuple(range)
 
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:

@@ -27,7 +27,7 @@
     X-CDMI-Specification-Version: 1.0
   response: 200
 
-- description: Read a Container Object (CDMI Content Type)
+- description: Read a range of children from a Container Object (CDMI Content Type)
   method: GET
   path: /mydata?children:0-42
   headers:
@@ -131,9 +131,25 @@
     X-CDMI-Specification-Version: 1.0
   response: 200
 
+- description: Read a part of a Data Object (CDMI Content Type)
+  method: GET
+  path: /mydata/hello.txt?valuerange;value:0-10
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.object+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
 - description: Read a Data Object (Non-CDMI Content Type)
   method: GET
   path: /mydata/hello.txt
+  response: 200
+
+- description: Read a part of a Data Object (Non-CDMI Content Type)
+  method: GET
+  path: /mydata/hello.txt
+  headers:
+    Content-Range: bytes=21-24
   response: 200
 
 - description: Read a Data Object Fields (Non-CDMI Content Type)
@@ -164,6 +180,16 @@
     Content-Type: text/plain
     Content-Length: 6
   data: sup?
+  response: 201
+
+- description: Update a part of a Data Object (Non-CDMI Content Type)
+  method: PUT
+  path: /mydata/hello.txt
+  headers:
+    Content-Type: text/plain
+    Content-Length: 2
+    Content-Range: bytes=0-1
+  data: XX
   response: 201
 
 - description: Delete a Data Object (CDMI Content Type)

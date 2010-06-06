@@ -8,14 +8,15 @@ class IO( object ):
     def __init__(self, root="./" ):
         self.root = root
 
-    def join(self, path ):
+    def resolve(self, path ):
+        path = path.replace("\\","/").lstrip("/")
         return os.path.join( self.root, path )
 
     def exists(self, path ):
-        return os.path.exists( self.join(path) )
+        return os.path.exists( self.resolve(path) )
 
     def objecttype(self, path ):
-        path = self.join( path )
+        path = self.resolve( path )
         if os.path.isdir( path ):
             return "container"
         elif os.path.isfile( path ):
