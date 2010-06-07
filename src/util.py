@@ -36,6 +36,8 @@ def byterange( s, length=None ):
     >>> byterange( "bytes=9500-", 10000 )
     (9500, 10000)
     """
+    if not s:
+        return None, None
     result = rx_bytes.match( s )
     if not result:
         return None, None
@@ -53,7 +55,7 @@ def byterange( s, length=None ):
             end = length-1
         if end is None:
             end = length-1
-    if not end:
+    if end is None:
         return start, end
     return start, end+1
 

@@ -55,25 +55,21 @@ class IO( object ):
                 ls[i] += "/"
         return ls
 
-    def write(self, path, fp, length, range=None ):
+    def write(self, path, fp, length, offset=None ):
         # important locking point.
 
-        givenlength = length
-        if range is not None and None not in range:
-            length = min( length, range[1]-range[0] )
-
-        if range is None or not self.exists(path):
+        if offset is None or not self.exists(path):
             mode = "wb"
         else:
             mode = "r+b"
         out = open( self.resolve( path ), mode, self.bufsize )
         out.seek(0, os.SEEK_SET)
-        if range is not None and range[0]:
-            out.seek( range[0], os.SEEK_SET )
+        if offset:
+            out.seek( offset, os.SEEK_SET )
 
         nbytes = 0
         while nbytes < length:
-            chunk = fp.read( min( length, self.bufsize ) )
+            chunk = fp.read( min( length-nbytes, self.bufsize ) )
             if not chunk:
                 break
             out.write( chunk )
@@ -81,8 +77,19 @@ class IO( object ):
 
         out.close()
 
-        if givenlength != length:
-            fp.read( givenlength - length )
+    def read(self, path, length, offset=None ):
+        f = open( self.resolve(path), "rb", self.bufsize )
+        try:
+            if offset:
+                f.seek( offset, os.SEEK_SET )
+            value = f.read( length )
+        finally:
+            f.close()
+        return value
+
+    def open(self, path, mode="rb" ):
+        # TODO: Figure out howto handle the close in this class
+        return open( self.resolve(path), mode, self.bufsize )
 
 class _Wrapper( object ):
     def __init__(self, io, path ):

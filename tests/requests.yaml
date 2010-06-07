@@ -162,7 +162,7 @@
   method: GET
   path: /mydata/hello.txt
   headers:
-    Content-Range: bytes=21-24
+    Range: bytes=2-4
   response: 200
 
 - description: Read a Data Object Fields (Non-CDMI Content Type)
@@ -201,7 +201,7 @@
   headers:
     Content-Type: text/plain
     Content-Length: 2
-    Content-Range: bytes=0-1
+    Range: bytes=0-1
   data: XX
   response: 201
 

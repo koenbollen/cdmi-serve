@@ -91,17 +91,39 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         except cdmi.OperationError, e:
             return self.send_error( e.httpcode, "%s: %s"%(e.message, e.cause))
 
-        if res is not False and len(res) == 2:
+        if res is not False:
             if res[1] is None:
                 self.send_response( *res[0] )
                 self.send_default_headers()
                 self.end_headers()
+            elif isinstance(res[1], file):
+                response, fp, length, offset, contenttype = res
+                self.send_response( *response )
+                self.send_default_headers()
+                self.send_header( "Content-Type", contenttype )
+                self.send_header( "Content-Length", length )
+                if self.request.range is not None:
+                    rangestr = "bytes=%d-%d" % ( offset, offset+length-1 )
+                    self.send_header( "Content-Range", rangestr )
+                self.end_headers()
+                nbytes = 0
+                while nbytes < length:
+                    l = min( length-nbytes, self.server.io.bufsize )
+                    chunk = fp.read( l )
+                    if not chunk:
+                        break
+                    self.wfile.write( chunk )
+                    nbytes += len( chunk )
+                fp.close()
             else:
-                mimetype = cdmi.mimetypes[objecttype]
-                data = json.dumps( res[1] ).rstrip() + "\r\n"
+                data = json.dumps( res[1] ).strip() + "\r\n"
                 self.send_response( *res[0] )
                 self.send_default_headers()
-                self.send_header( "Content-Type", mimetype )
+                if iscdmi:
+                    mimetype = cdmi.mimetypes[objecttype]
+                    self.send_header( "Content-Type", mimetype )
+                else:
+                    self.send_header( "Content-Type", "text/json" )
                 self.send_header( "Content-Length", len(data) )
                 self.end_headers()
                 self.wfile.write( data )

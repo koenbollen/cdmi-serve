@@ -4,6 +4,7 @@
 SPECIFICATION_VERSION = 1.0
 DEFAULT_PORT = 2364
 
+import os
 from StringIO import StringIO
 try:
     import json
@@ -229,13 +230,11 @@ class Request( object ):
             if "value" in self.fields and self.fields['value'] is not None:
                 rangestr = "bytes=" + self.fields['value']
         else:
-            if "Content-Range" in self.headers:
-                rangestr = self.headers['Content-Range']
+            if "Range" in self.headers:
+                rangestr = self.headers['Range']
 
-        if rangestr is not None:
+        if rangestr:
             self.range = util.byterange( rangestr )
-        else:
-            self.range = None
 
     def container(self ):
         if "children" in self.fields and self.fields['children'] is not None:
@@ -266,9 +265,11 @@ class Handler( object ):
             if target.objecttype() != "container" or noclobber:
                 raise OperationError( 409, "path exists" )
 
-        stype = self.request.source[0]
-        if stype in ("move","copy","reference"):
-            raise OperationError( 501, "not yet implemented", stype )
+        # TODO: Do this at a higher level:
+        if self.request.source is not None:
+            stype, source = self.request.source
+            if stype in ("move","copy","reference"):
+                raise OperationError( 501, "not yet implemented", stype )
 
         try:
             target.mkdir()
@@ -311,7 +312,7 @@ class Handler( object ):
             if s is None or s < 0:
                 s = 0;
             if e is None or e > len(children)-1:
-                e = len(children)-1
+                e = max(0,len(children)-1)
             childrenrange = "%d-%d" % (s,e+1-s) # remember? inclusive endpoint
             children = children[s:e]
 
@@ -349,7 +350,13 @@ class Handler( object ):
 
     def put_dataobject(self ):
         target = self.target
-        stype, source = self.request.source
+
+        # TODO: Do this at a higher level:
+        source = self.request.source
+        if source is None:
+            stype, source = None, None
+        else:
+            stype, source = source
 
         noclobber = self.request.headers.get("X-CDMI-NoClobber", "false") # TEST
         noclobber = noclobber.strip().lower() in ("true","yes","1")
@@ -366,10 +373,18 @@ class Handler( object ):
             else:
                 fp = self.request.fp
                 length = source
+            offset = None
 
-            range = self.request.range
+            if self.request.range is not None:
+                s, e = self.request.range
+                offset = None
+                if s is not None:
+                    offset = s
+                if e is not None:
+                    length = min( length, e-s )
+
             try:
-                target.write( fp, length, range )
+                target.write( fp, length, offset )
             except (OSError, IOError), e:
                 httpcode = 500
                 if e.errno == 2:
@@ -394,7 +409,51 @@ class Handler( object ):
         return ( (201,), reply )
 
     def get_dataobject(self ):
-        pass
+        target = self.target
+        path = self.request.path
+        fields = self.request.fields
+        range = self.request.range
+
+        stat = target.stat()
+        length = stat.st_size
+        offset = None
+
+        if self.request.range is not None:
+            s, e = self.request.range
+            if s is None or s < 0:
+                s = 0
+            offset = s
+            if e is not None:
+                length = min( length, e-s )
+            else:
+                e = length
+        else:
+            s = 0
+            e = length
+        rangestr = "%d-%d" % (s, e-1) # protocol speak inclusive
+
+        if self.request.cdmi or len(fields) > 0:
+            value = target.read( length, offset )
+
+            reply = {
+                    'objectID': util.objectid( path ),
+                    'objectURI': path,
+                    'parentURI': target.parent(),
+                    'mimetype': "application/octet-stream",
+                    'metadata': {},
+                    'valuerange': rangestr,
+                    'value': value,
+                }
+            if len(fields) > 0:
+                for key in reply.keys():
+                    if key.lower() not in fields:
+                        del reply[key]
+            return ( (200,), reply )
+
+        fp = target.open()
+        if offset:
+            fp.seek( offset, os.SEEK_SET )
+        return ( (200,), fp, length, offset, "application/octet-stream" )
 
     def delete_dataobject(self ):
         pass
