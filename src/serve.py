@@ -19,7 +19,7 @@ class CDMIServer( HTTPServer ):
 
 class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
-    server_version = "CMDI-Dummy/dev"
+    server_version = "CMDI-Serve/dev"
     protocol_version = "HTTP/1.1"
 
     def do_REQUEST(self ):
