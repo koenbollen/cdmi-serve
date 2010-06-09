@@ -340,9 +340,9 @@ class Handler( object ):
             target.rmdir()
         except OSError, e:
             httpcode = 500
-            if e.errno == 2:
+            if e.errno == 2: # No such file or directory
                 httpcode = 404
-            if e.errno == 39:
+            if e.errno == 39: # Directory not empty
                 httpcode = 409
             raise OperationError( httpcode, "unable to remove directory", e );
 
@@ -387,9 +387,9 @@ class Handler( object ):
                 target.write( fp, length, offset )
             except (OSError, IOError), e:
                 httpcode = 500
-                if e.errno == 2:
+                if e.errno == 2: # No such file or directory
                     httpcode = 404
-                elif e.errno == 28:
+                elif e.errno == 28: # No space left on device
                     httpcode = 504
                 raise OperationError( httpcode, "unable to write to file", e )
 
@@ -456,7 +456,17 @@ class Handler( object ):
         return ( (200,), fp, length, offset, "application/octet-stream" )
 
     def delete_dataobject(self ):
-        pass
+        target = self.target
+
+        try:
+            target.unlink()
+        except OSError, e:
+            httpcode = 500
+            if e.errno == 2: # No such file or directory
+                httpcode = 404
+            raise OperationError( httpcode, "unable to unlink file", e );
+
+        return ( (200,), None )
 
 
 

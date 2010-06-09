@@ -18,7 +18,7 @@ class IO( object ):
         self.bufsize = bufsize
 
     def buildtarget(self, path ):
-        return _Wrapper( self, path )
+        return _Curry( self, path )
 
     def resolve(self, path ):
         path = path.replace("\\","/").lstrip("/")
@@ -91,7 +91,11 @@ class IO( object ):
         # TODO: Figure out howto handle the close in this class
         return open( self.resolve(path), mode, self.bufsize )
 
-class _Wrapper( object ):
+    def unlink(self, path ):
+        return os.unlink( self.resolve( path ) )
+
+
+class _Curry( object ):
     def __init__(self, io, path ):
         self.io = io
         self.path = path
@@ -100,9 +104,10 @@ class _Wrapper( object ):
         # FEATURE: Cache here, object bound.
         mthd = getattr( self.io, name )
         @wraps( mthd )
-        def wrapper( *args, **kwargs ):
+        def curried( *args, **kwargs ):
             return mthd(self.path, *args, **kwargs )
-        return wrapper
+        curried.__name__ += "-curried"
+        return curried
 
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:

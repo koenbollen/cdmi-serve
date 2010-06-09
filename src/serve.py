@@ -66,6 +66,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             if objecttype=="container" and len(self.request.fields) == 0:
                 return self.send_error( 400, "missing fields" )
 
+        # Call the object type specific parse method:
         try:
             typemthd = getattr( self.request, objecttype )
         except AttributeError:
@@ -76,10 +77,9 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             except cdmi.ProtocolError, e:
                 return self.send_error( 400, e )
 
-        mname = method+"_"+objecttype
-
         handler = cdmi.Handler( self.request, io )
         try:
+            mname = method+"_"+objecttype
             mthd = getattr( handler, mname )
         except AttributeError, e:
             return self.send_error(
