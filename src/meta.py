@@ -58,7 +58,7 @@ class Meta( object ):
 
         self.dbc.commit()
 
-    def update(self, objectid, *args ):
+    def update(self, objectid, *args, **kwargs ):
 
         metadata = None
         mimetype = None
@@ -75,6 +75,8 @@ class Meta( object ):
         try:
             mime, meta = self.get( objectid )
         except KeyError:
+            if kwargs.get("nocreate",False):
+                raise
             self.set( objectid, *args )
             return mimetype, metadata
         if mimetype is not None:

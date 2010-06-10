@@ -5,6 +5,7 @@ SPECIFICATION_VERSION = 1.0
 DEFAULT_PORT = 2364
 
 import os
+from datetime import datetime
 from StringIO import StringIO
 try:
     import json
@@ -283,13 +284,18 @@ class Handler( object ):
                 raise OperationError( httpcode, "unable to create directory", e );
         objectid = util.objectid( self.request.path )
 
-        # save user metadata:
-        metadata = {}
+        now = datetime.now().isoformat()
+        metadata = {
+                'cdmi_ctime': now,
+                'cdmi_atime': now,
+                'cdmi_mtime': now,
+            }
         if json and "metadata" in json:
-            metadata = json['metadata']
-            for key in metadata.keys():
+            userdata = json['metadata']
+            for key in userdata.keys():
                 if key.startswith( "cdmi_" ):
-                    del metadata[key]
+                    del userdata[key]
+            metadata.update( userdata )
             _, metadata = self.meta.update( objectid, metadata )
 
         reply = None
@@ -426,6 +432,15 @@ class Handler( object ):
                     del metadata[key]
             mimetype, metadata = self.meta.update(objectid, mimetype, metadata)
 
+        # system metadata:
+        now = datetime.now().isoformat()
+        metadata['cdmi_size'] = length
+        if "cdmi_ctime" not in metadata:
+            metadata['cdmi_ctime'] = now
+        metadata['cdmi_mtime'] = now
+        metadata['cdmi_atime'] = now
+        mimetype, metadata = self.meta.update(objectid, mimetype, metadata)
+
         reply = None
         if self.request.cdmi:
             reply = {
@@ -474,7 +489,10 @@ class Handler( object ):
             value = target.read( length, offset )
 
             try:
-                mimetype, metadata = self.meta.get( objectid )
+                mimetype, metadata = self.meta.update( objectid,
+                        { 'cdmi_atime': datetime.now().isoformat() },
+                        nocreate=True
+                    )
             except KeyError:
                 mimetype = "application/octet-stream"
                 metadata = {}
