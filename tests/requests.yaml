@@ -9,6 +9,8 @@
   data: |
     {
         "metadata": {
+            "project": "cdmi",
+            "author": "koen"
         }
     }
   response: 201
@@ -121,6 +123,7 @@
     {
         "mimetype" : "text/plain",
         "metadata" : {
+            "author": "Kaji"
         },
         "value" : "Hello, world!!"
     }
@@ -179,8 +182,9 @@
     X-CDMI-Specification-Version: 1.0
   data: |
     {
-        "mimetype" : "text/plain",
+        "mimetype" : "image/png",
         "metadata" : {
+            "touched": true
         },
         "value" : "new value.."
     }

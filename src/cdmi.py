@@ -250,13 +250,15 @@ class Request( object ):
 
 class Handler( object ):
 
-    def __init__(self, request, io ):
+    def __init__(self, request, io, meta ):
         self.request = request
         self.io = io
+        self.meta = meta
         self.target = io.buildtarget( self.request.path )
 
     def put_container(self ):
         target = self.target
+        json = self.request.json
 
         noclobber = self.request.headers.get("X-CDMI-NoClobber", "false") # TEST
         noclobber = noclobber.strip().lower() in ("true","yes","1")
@@ -279,8 +281,16 @@ class Handler( object ):
                 httpcode = 404
             if e.errno != 17 and not noclobber: # File exists
                 raise OperationError( httpcode, "unable to create directory", e );
+        objectid = util.objectid( self.request.path )
 
-        # save user metadata here
+        # save user metadata:
+        metadata = {}
+        if json and "metadata" in json:
+            metadata = json['metadata']
+            for key in metadata.keys():
+                if key.startswith( "cdmi_" ):
+                    del metadata[key]
+            _, metadata = self.meta.update( objectid, metadata )
 
         reply = None
         if self.request.cdmi:
@@ -289,11 +299,11 @@ class Handler( object ):
             except OSError: # doesnt happen
                 children = []
             reply = {
-                    'objectID': util.objectid( self.request.path ),
+                    'objectID': objectid,
                     'objectURI': self.request.path,
                     'parentURI': target.parent(),
                     'completionStatus': "Complete",
-                    #'metadata': {},
+                    'metadata': metadata,
                     'childrenrange': "0-%d" % len(children),
                     'children': children,
                 }
@@ -305,7 +315,10 @@ class Handler( object ):
         try:
             children = target.list()
         except OSError, e:
-            raise OperationError( 500, "unable to list directory", e )
+            httpcode = 500
+            if e.errno == 2: # No such file or directory
+                httpcode = 404
+            raise OperationError( httpcode, "unable to list directory", e )
         childrenrange = "0-%d" % len(children)
         if self.request.range:
             s, e = self.request.range
@@ -315,15 +328,19 @@ class Handler( object ):
                 e = max(0,len(children)-1)
             childrenrange = "%d-%d" % (s,e+1-s) # remember? inclusive endpoint
             children = children[s:e]
+        objectid = util.objectid( self.request.path )
 
-        # load user metadata here
+        try:
+            _, metadata = self.meta.get( objectid )
+        except KeyError:
+            metadata = {}
 
         reply = {
-                'objectID': util.objectid( self.request.path ),
+                'objectID': objectid,
                 'objectURI': self.request.path,
                 'parentURI': target.parent(),
                 'completionStatus': "Complete",
-                'metadata': {},
+                'metadata': metadata,
                 'childrenrange': childrenrange,
                 'children': children,
             }
@@ -350,6 +367,7 @@ class Handler( object ):
 
     def put_dataobject(self ):
         target = self.target
+        json = self.request.json
 
         # TODO: Do this at a higher level:
         source = self.request.source
@@ -396,14 +414,26 @@ class Handler( object ):
         elif stype in ("move","copy","reference"):
             raise OperationError( 501, "not yet implemented", stype)
 
+        objectid = util.objectid( self.request.path )
+
+        # save user metadata:
+        metadata = {}
+        if json and "metadata" in json:
+            mimetype = json.get( "mimetype", None )
+            metadata = json['metadata']
+            for key in metadata.keys():
+                if key.startswith( "cdmi_" ):
+                    del metadata[key]
+            mimetype, metadata = self.meta.update(objectid, mimetype, metadata)
+
         reply = None
         if self.request.cdmi:
             reply = {
-                    'objectID': util.objectid( self.request.path ),
+                    'objectID': objectid,
                     'objectURI': self.request.path,
                     'parentURI': target.parent(),
-                    'mimetype': "application/octet-stream",
-                    'metadata': {},
+                    'mimetype': mimetype,
+                    'metadata': metadata,
                     'completionStatus': "Complete",
                 }
         return ( (201,), reply )
@@ -414,7 +444,14 @@ class Handler( object ):
         fields = self.request.fields
         range = self.request.range
 
-        stat = target.stat()
+        try:
+            stat = target.stat()
+        except OSError, e:
+            httpcode = 500
+            if e.errno == 2: # No such file or directory
+                httpcode = 404
+            raise OperationError( httpcode, "unable to stat file", e );
+
         length = stat.st_size
         offset = None
 
@@ -433,14 +470,23 @@ class Handler( object ):
         rangestr = "%d-%d" % (s, e-1) # protocol speak inclusive
 
         if self.request.cdmi or len(fields) > 0:
+            objectid = util.objectid( self.request.path )
             value = target.read( length, offset )
 
+            try:
+                mimetype, metadata = self.meta.get( objectid )
+            except KeyError:
+                mimetype = "application/octet-stream"
+                metadata = {}
+
+            # TODO: Load system metadata here.
+
             reply = {
-                    'objectID': util.objectid( path ),
+                    'objectID': objectid,
                     'objectURI': path,
                     'parentURI': target.parent(),
-                    'mimetype': "application/octet-stream",
-                    'metadata': {},
+                    'mimetype': mimetype,
+                    'metadata': metadata,
                     'valuerange': rangestr,
                     'value': value,
                 }

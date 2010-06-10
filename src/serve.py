@@ -13,9 +13,10 @@ class CDMIServer( HTTPServer ):
     debug = False
     allow_reuse_address = True
 
-    def __init__(self, address, handler, io ):
+    def __init__(self, address, handler, io, meta ):
         HTTPServer.__init__(self, address, handler )
         self.io = io
+        self.meta = meta
 
 class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
@@ -77,7 +78,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             except cdmi.ProtocolError, e:
                 return self.send_error( 400, e )
 
-        handler = cdmi.Handler( self.request, io )
+        handler = cdmi.Handler( self.request, io, self.server.meta )
         try:
             mname = method+"_"+objecttype
             mthd = getattr( handler, mname )
@@ -151,9 +152,11 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
 def test(): # dev main only
     import io as _io
+    import meta as _meta
     s = CDMIServer(
             ('',2364), CDMIRequestHandler,
-            _io.IO( "data/" )
+            _io.IO( "data/" ),
+            _meta.Meta( "sqlite3", "data.db" )
         )
     s.debug = True
     try:

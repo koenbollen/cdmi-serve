@@ -9,7 +9,6 @@ So, this project is aiming at a basic, simple yet complete CDMI server in
 Python. It may not implement every last aspect of the protocol, but it will
 support at least everything that can't be disabled using the capabilities.
 
-- - -
 
 
 Quickstart
@@ -22,7 +21,6 @@ To run the server execute the following commands:
     $ mkdir data
     $ python src/serve.py
 
-- - -
 
 
 Author
@@ -31,7 +29,6 @@ Author
 This project is made as part of an internship at [SARA][2] by Koen Bollen, the
 Netherlands. 2010
 
-- - -
 
 
 [1]: http://cdmi.sniacloud.com/ "Cloud Data Management Interface"
