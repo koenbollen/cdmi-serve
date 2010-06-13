@@ -57,8 +57,12 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                 if not io.exists( path ):
                     return self.send_error( 404 )
                 if objecttype == "unknown":
-                    self.request.objecttype = io.objecttype( path)
-                    objecttype = self.request.objecttype
+                    self.request.objecttype = objecttype = io.objecttype( path)
+        if iscdmi and objecttype == "unknown":
+            if not io.exists( path ):
+                return self.send_error( 404 )
+            self.request.objecttype = objecttype = io.objecttype( path)
+
 
         assert objecttype != "unknown"
 
@@ -96,6 +100,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             if res[1] is None:
                 self.send_response( *res[0] )
                 self.send_default_headers()
+                self.send_header( "Content-Length", 0 )
                 self.end_headers()
             elif isinstance(res[1], file):
                 response, fp, length, offset, contenttype = res

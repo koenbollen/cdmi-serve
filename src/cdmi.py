@@ -93,7 +93,7 @@ class Request( object ):
         self.headers = headers
         self.cdmi = None
         self.objecttype = "unknown"
-        self.source = None
+        self.source = None, None
         self.rawdata = None
         self.json = None
         self.range = None
@@ -261,18 +261,16 @@ class Handler( object ):
         target = self.target
         json = self.request.json
 
-        noclobber = self.request.headers.get("X-CDMI-NoClobber", "false") # TEST
+        noclobber = self.request.headers.get("X-CDMI-NoClobber", "false")
         noclobber = noclobber.strip().lower() in ("true","yes","1")
 
         if target.exists():
             if target.objecttype() != "container" or noclobber:
                 raise OperationError( 409, "path exists" )
 
-        # TODO: Do this at a higher level:
-        if self.request.source is not None:
-            stype, source = self.request.source
-            if stype in ("move","copy","reference"):
-                raise OperationError( 501, "not yet implemented", stype )
+        stype, source = self.request.source
+        if stype in ("move","copy","reference"):
+            raise OperationError( 501, "not yet implemented", stype )
 
         try:
             target.mkdir()
@@ -284,12 +282,7 @@ class Handler( object ):
                 raise OperationError( httpcode, "unable to create directory", e );
         objectid = util.objectid( self.request.path )
 
-        now = datetime.now().isoformat()
-        metadata = {
-                'cdmi_ctime': now,
-                'cdmi_atime': now,
-                'cdmi_mtime': now,
-            }
+        metadata = {}
         if json and "metadata" in json:
             userdata = json['metadata']
             for key in userdata.keys():
@@ -341,6 +334,8 @@ class Handler( object ):
         except KeyError:
             metadata = {}
 
+        metadata.update( self.cdmimetadata() )
+
         reply = {
                 'objectID': objectid,
                 'objectURI': self.request.path,
@@ -369,20 +364,17 @@ class Handler( object ):
                 httpcode = 409
             raise OperationError( httpcode, "unable to remove directory", e );
 
+        self.meta.delete( util.objectid( self.request.path ) )
+
         return ( (200,), None )
 
     def put_dataobject(self ):
         target = self.target
         json = self.request.json
 
-        # TODO: Do this at a higher level:
-        source = self.request.source
-        if source is None:
-            stype, source = None, None
-        else:
-            stype, source = source
+        stype, source = self.request.source
 
-        noclobber = self.request.headers.get("X-CDMI-NoClobber", "false") # TEST
+        noclobber = self.request.headers.get("X-CDMI-NoClobber", "false")
         noclobber = noclobber.strip().lower() in ("true","yes","1")
 
         if target.exists():
@@ -432,15 +424,6 @@ class Handler( object ):
                     del metadata[key]
             mimetype, metadata = self.meta.update(objectid, mimetype, metadata)
 
-        # system metadata:
-        now = datetime.now().isoformat()
-        metadata['cdmi_size'] = length
-        if "cdmi_ctime" not in metadata:
-            metadata['cdmi_ctime'] = now
-        metadata['cdmi_mtime'] = now
-        metadata['cdmi_atime'] = now
-        mimetype, metadata = self.meta.update(objectid, mimetype, metadata)
-
         reply = None
         if self.request.cdmi:
             reply = {
@@ -482,7 +465,7 @@ class Handler( object ):
         else:
             s = 0
             e = length
-        rangestr = "%d-%d" % (s, e-1) # protocol speak inclusive
+        rangestr = "%d-%d" % (s, e-1) # protocol speaks inclusive
 
         if self.request.cdmi or len(fields) > 0:
             objectid = util.objectid( self.request.path )
@@ -496,8 +479,7 @@ class Handler( object ):
             except KeyError:
                 mimetype = "application/octet-stream"
                 metadata = {}
-
-            # TODO: Load system metadata here.
+            metadata.update( self.cdmimetadata() )
 
             reply = {
                     'objectID': objectid,
@@ -530,7 +512,23 @@ class Handler( object ):
                 httpcode = 404
             raise OperationError( httpcode, "unable to unlink file", e );
 
+        self.meta.delete( util.objectid( self.request.path ) )
+
         return ( (200,), None )
+
+    def cdmimetadata(self ):
+        result = {}
+        stat = self.target.stat()
+        directmap = ('size', 'ctime', 'atime', 'mtime')
+        for field in directmap:
+            value = getattr(stat, "st_%s"%field)
+            if field.endswith("time"): # xD
+                try:
+                    value = datetime.fromtimestamp(float(value)).isoformat()
+                except ValueError:
+                    pass
+            result["cdmi_%s" % field] = value
+        return result
 
 
 
