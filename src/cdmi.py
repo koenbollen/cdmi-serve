@@ -264,25 +264,46 @@ class Handler( object ):
         noclobber = self.request.headers.get("X-CDMI-NoClobber", "false")
         noclobber = noclobber.strip().lower() in ("true","yes","1")
 
+        objectid = util.objectid( self.request.path )
+        metadata = {}
+
         if target.exists():
             if target.objecttype() != "container" or noclobber:
                 raise OperationError( 409, "path exists" )
 
         stype, source = self.request.source
-        if stype in ("move","copy","reference"):
+        if stype in ("copy","reference"):
             raise OperationError( 501, "not yet implemented", stype )
 
-        try:
-            target.mkdir()
-        except OSError, e:
-            httpcode = 500
-            if e.errno == 2:
-                httpcode = 404
-            if e.errno != 17 and not noclobber: # File exists
+        if stype == "move":
+            if target.exists():
+                raise OperationError( 409,
+                        "file or director exists",
+                        self.request.path )
+            try:
+                target.rename( source )
+            except OSError, e:
+                httpcode = 500
+                if e.errno == 2:
+                    httpcode = 404
                 raise OperationError( httpcode, "unable to create directory", e );
-        objectid = util.objectid( self.request.path )
 
-        metadata = {}
+            try:
+                _, metadata = self.meta.get( util.objectid(source) )
+                self.meta.set( objectid, metadata )
+            except KeyError:
+                pass
+
+        else:
+            try:
+                target.mkdir()
+            except OSError, e:
+                httpcode = 500
+                if e.errno == 2:
+                    httpcode = 404
+                if e.errno != 17 and not noclobber: # File exists
+                    raise OperationError( httpcode, "unable to create directory", e );
+
         if json and "metadata" in json:
             userdata = json['metadata']
             for key in userdata.keys():
@@ -377,6 +398,8 @@ class Handler( object ):
         noclobber = self.request.headers.get("X-CDMI-NoClobber", "false")
         noclobber = noclobber.strip().lower() in ("true","yes","1")
 
+        objectid = util.objectid( self.request.path )
+
         if target.exists():
             if target.objecttype() != "dataobject" or noclobber:
                 raise OperationError( 409, "path exists" )
@@ -409,14 +432,29 @@ class Handler( object ):
                     httpcode = 504
                 raise OperationError( httpcode, "unable to write to file", e )
 
-        elif stype in ("move","copy","reference"):
-            raise OperationError( 501, "not yet implemented", stype)
+        elif stype == "move":
 
-        objectid = util.objectid( self.request.path )
+            try:
+                target.rename( source )
+            except OSError, e:
+                httpcode = 500
+                if e.errno == 2:
+                    httpcode = 404
+                raise OperationError( httpcode, "unable to create directory", e );
+
+            try:
+                mimetype, metadata = self.meta.get( util.objectid(source) )
+                self.meta.set( objectid, mimetype, metadata )
+            except KeyError:
+                pass
+
+        elif stype in ("copy","reference"):
+            raise OperationError( 501, "not yet implemented", stype)
 
         # save user metadata:
         metadata = {}
-        if json and "metadata" in json:
+        mimetype = None
+        if json and ("metadata" in json or "mimetype" in json):
             mimetype = json.get( "mimetype", None )
             metadata = json['metadata']
             for key in metadata.keys():

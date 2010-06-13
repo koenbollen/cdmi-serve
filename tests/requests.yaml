@@ -138,6 +138,22 @@
   data: Hello, world!!
   response: 201
 
+- description: Move a Data Object (CDMI Content Type)
+  method: PUT
+  path: /mydata/hello-again.txt
+  headers:
+    Accept: application/vnd.org.snia.cdmi.dataobject+json
+    Content-Type: application/vnd.org.snia.cdmi.dataobject+json
+    X-CDMI-Specification-Version: 1.0
+  data: |
+    {
+        "move": "/mydata/hello.txt",
+        "metadata": {
+            "original": "/mydata/hello.txt"
+        }
+    }
+  response: 201
+
 - description: Read a Data Object (CDMI Content Type)
   method: GET
   path: /mydata/hello.txt

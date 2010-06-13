@@ -47,6 +47,10 @@ class IO( object ):
     def rmdir(self, path ):
         return os.rmdir( self.resolve( path ) )
 
+    def rename( self, path, source ):
+        print "rename", source, "=>", path
+        return os.rename( self.resolve(source), self.resolve(path) )
+
     def list(self, path ):
         path = self.resolve( path )
         ls = os.listdir( path )
