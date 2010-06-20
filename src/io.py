@@ -1,13 +1,10 @@
 # Koen Bollen <meneer koenbollen nl>
 # 2010 GPL
 #
-# TODO: Make this module threadsafe (by indepth path), very important.
-#
-
 
 import os
-
 from functools import wraps
+import threading
 
 DEFAULT_BUFSIZE = 64*1024
 
@@ -16,6 +13,20 @@ class IO( object ):
     def __init__(self, root="./", bufsize=DEFAULT_BUFSIZE ):
         self.root = root
         self.bufsize = bufsize
+
+        self.locks = {}
+
+    def __acquire(self, path ):
+        #print "acquiring lock:", path
+        if path not in self.locks:
+            self.locks[path] = threading.Lock()
+        self.locks[path].acquire()
+
+    def __release(self, path ):
+        #print "releasing lock:", path
+        if path not in self.locks:
+            self.locks[path] = threading.Lock()
+        self.locks[path].release()
 
     def buildtarget(self, path ):
         return _Curry( self, path )
@@ -48,8 +59,12 @@ class IO( object ):
         return os.rmdir( self.resolve( path ) )
 
     def rename( self, path, source ):
-        print "rename", source, "=>", path
-        return os.rename( self.resolve(source), self.resolve(path) )
+        self.__acquire( source )
+        self.__acquire( path )
+        result = os.rename( self.resolve(source), self.resolve(path) )
+        self.__release( path )
+        self.__release( source )
+        return result
 
     def list(self, path ):
         path = self.resolve( path )
@@ -60,7 +75,7 @@ class IO( object ):
         return ls
 
     def write(self, path, fp, length, offset=None ):
-        # important locking point.
+        self.__acquire( path )
 
         if offset is None or not self.exists(path):
             mode = "wb"
@@ -80,8 +95,11 @@ class IO( object ):
             nbytes += len(chunk)
 
         out.close()
+        self.__release( path )
+        return nbytes
 
     def read(self, path, length, offset=None ):
+        self.__acquire( path )
         f = open( self.resolve(path), "rb", self.bufsize )
         try:
             if offset:
@@ -89,15 +107,30 @@ class IO( object ):
             value = f.read( length )
         finally:
             f.close()
+        self.__release( path )
         return value
 
     def open(self, path, mode="rb" ):
-        # TODO: Figure out howto handle the close in this class
-        return open( self.resolve(path), mode, self.bufsize )
+        self.__acquire( path )
+        fp = _ControlledFile( self.resolve(path), mode, self.bufsize )
+        fp.io = self
+        fp.path = path
+        return fp
+
+    def close(self, path ):
+        self.__release( path )
 
     def unlink(self, path ):
-        return os.unlink( self.resolve( path ) )
+        self.__acquire( path )
+        res = os.unlink( self.resolve( path ) )
+        self.__release( path )
+        return res
 
+
+class _ControlledFile( file ):
+    def close(self ):
+        self.io.close( self.path )
+        file.close( self )
 
 class _Curry( object ):
     def __init__(self, io, path ):
