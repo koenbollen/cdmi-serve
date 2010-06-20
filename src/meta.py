@@ -1,11 +1,10 @@
 # Koen Bollen <meneer koenbollen nl>
 # 2010 GPL
 #
-# TODO: Make this module threadsafe.
-#
 
 import sys
 import cPickle as pickle
+import threading
 
 
 class Meta( object ):
@@ -13,6 +12,8 @@ class Meta( object ):
     debug = False
 
     def __init__(self, dbtype, dbconnect ):
+
+        self.lock = threading.Lock()
 
         try:
             self.dba = __import__( dbtype )
@@ -26,10 +27,28 @@ class Meta( object ):
         sql  = "CREATE TABLE IF NOT EXISTS objects (\n"
         sql += "  objectid UNIQUE NOT NULL,\n"
         sql += "  mimetype NULL, metadata )\n"
-        if self.debug: print "meta: %r"%sql
-        c.execute( sql )
+        self.execute( sql )
 
         self.dbc.commit()
+
+
+    def execute(self, sql, args=None ):
+        self.lock.acquire()
+
+        if self.debug:
+            print "meta.py: sql: %r"%sql
+
+        c = self.dbc.cursor()
+        if args is None:
+            c.execute( sql )
+        else:
+            c.execute( sql, args )
+        result = c.fetchall()
+        c.close()
+        self.dbc.commit()
+
+        self.lock.release()
+        return result
 
     def set(self, objectid, *args ):
 
@@ -50,13 +69,8 @@ class Meta( object ):
 
         data = pickle.dumps( metadata )
 
-        c = self.dbc.cursor()
-
         sql = "INSERT OR REPLACE INTO objects VALUES (?, ?, ?)"
-        if self.debug: print "meta: %r"%sql
-        c.execute( sql, (objectid, mimetype, data ) )
-
-        self.dbc.commit()
+        self.execute( sql, (objectid, mimetype, data ) )
 
     def update(self, objectid, *args, **kwargs ):
 
@@ -99,12 +113,11 @@ class Meta( object ):
 
         sql  = "SELECT mimetype, metadata FROM objects\n"
         sql += "WHERE objectid = ?\n"
-        if self.debug: print "meta: %r"%sql
-        c.execute( sql, ( objectid, ) )
+        result = self.execute( sql, ( objectid, ) )
 
-        row = c.fetchone()
-        if not row:
+        if len(result) < 1:
             raise KeyError( objectid )
+        row = result[0]
         mime, meta = row[:2]
 
         if mime is not None:
@@ -121,8 +134,7 @@ class Meta( object ):
 
         sql  = "DELETE FROM objects\n"
         sql += "WHERE objectid = ?\n"
-        if self.debug: print "meta: %r"%sql
-        c.execute( sql, ( objectid, ) )
+        self.execute( sql, ( objectid, ) )
 
         self.dbc.commit()
 
