@@ -1,6 +1,7 @@
 # Koen Bollen <meneer koenbollen nl>
 # 2010 GPL
 
+from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 try:
     import json
@@ -9,7 +10,7 @@ except ImportError:
 
 import cdmi
 
-class CDMIServer( HTTPServer ):
+class CDMIServer( ThreadingMixIn, HTTPServer ):
     debug = False
     allow_reuse_address = True
 
@@ -24,6 +25,14 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
     protocol_version = "HTTP/1.1"
 
     def do_REQUEST(self ):
+
+        if self.server.debug:
+            if self.path.startswith( "/cdmi_generate_" ):
+                try:
+                    code = int( self.path[15:] )
+                except ValueError:
+                    code = 400
+                return self.send_error( code )
 
         try:
             self.request = cdmi.Request( self.command, self.path, self.headers )
@@ -81,6 +90,14 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                 typemthd()
             except cdmi.ProtocolError, e:
                 return self.send_error( 400, e )
+
+        if self.server.debug:
+            if "x-debug-sleep" in headers:
+                try:
+                    from time import sleep
+                    sleep( int( headers['x-debug-sleep'] ) )
+                except ValueError:
+                    pass
 
         handler = cdmi.Handler( self.request, io, self.server.meta )
         try:
