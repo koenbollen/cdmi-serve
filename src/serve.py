@@ -3,6 +3,8 @@
 
 from SocketServer import ThreadingMixIn
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+import logging
+
 try:
     import json
 except ImportError:
@@ -18,6 +20,9 @@ class CDMIServer( ThreadingMixIn, HTTPServer ):
         HTTPServer.__init__(self, address, handler )
         self.io = io
         self.meta = meta
+
+    def close(self ):
+        logging.info( "quit" )
 
 class CDMIRequestHandler( BaseHTTPRequestHandler ):
 
@@ -171,24 +176,9 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         self.end_headers()
         self.wfile.write( content )
 
-
-def test(): # dev main only
-    import io as _io
-    import meta as _meta
-    s = CDMIServer(
-            ('',2364), CDMIRequestHandler,
-            _io.IO( "data/" ),
-            _meta.Meta( "sqlite3", "data.db" )
-        )
-    s.debug = True
-    try:
-        print "listening on", s.server_port
-        s.serve_forever()
-    except KeyboardInterrupt:
-        print "quit"
-
-if __name__ == "__main__":
-    test()
+    def log_message(self, format, *args):
+        msg = "%s %s" % ( self.address_string(), format%args )
+        logging.info( msg )
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:
 

@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+# Koen Bollen <meneer koenbollen nl>
+# 2010 GPL
+
+from ConfigParser import SafeConfigParser, NoOptionError, NoSectionError
+from select import error as selecterror
+import io
+import logging
+import meta
+import optparse
+import os
+import serve
+import signal
+
+app = None
+
+def signalhandler( signum, frame ):
+    global app
+    if app:
+        app.close()
+
+def main():
+    global app
+
+    parser = optparse.OptionParser( "usage: %prog [options...] root" )
+    parser.add_option(
+            "-c", "--config", default=None,
+            metavar="FILE", help="use FILE as configfile"
+        )
+    parser.add_option(
+            "-f", "--nodaemon", action="store_true", default=False,
+            help="do not fork into the background"
+        )
+    parser.add_option(
+            "-v", "--verbose", action="store_true", default=False,
+            help="print log messages"
+        )
+    parser.add_option(
+            "-d", "--debug", action="store_true", default=False,
+            help="enable debug features (implies -v)"
+        )
+    options, args = parser.parse_args()
+
+    cfg = SafeConfigParser()
+    filelist = ( "cdmi-serve.cfg",
+            os.path.expanduser( "~/.cdmi-serve.cfg" ),
+            "/etc/cdmi-serve.cfg" )
+    if options.config:
+        filelist += (options.config,)
+    read = cfg.read( filelist )
+    if not cfg.has_section( "cdmi-serve" ):
+        cfg.add_section( "cdmi-serve" )
+
+    if not options.verbose and cfg.has_option( "cdmi-serve", "verbose" ):
+        options.verbose = cfg.getboolean( "cdmi-serve", "verbose" )
+    if not options.debug and cfg.has_option( "cdmi-serve", "debug" ):
+        options.debug = cfg.getboolean( "cdmi-serve", "debug" )
+
+    if len(read)>0 and cfg.has_section("loggers"):
+        for file in read:
+            logging.config.fileConfig( file )
+        if options.verbose:
+            logging.getLogger().addHandler( logging.StreamHandler() )
+    else:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+    logging.debug( "read config: %s", ", ".join( read ) )
+
+    if len(args) > 0:
+        root = args[0]
+    elif cfg.has_option( "cdmi-serve", "root" ):
+        root = cfg.get( "cdmi-serve", "root" )
+    else:
+        parser.error( "missing argument: root" )
+
+    try:
+        port = cfg.getint( "cdmi-serve", "listen" )
+    except (NoOptionError, ValueError):
+        port = 2364
+    try:
+        bind = cfg.get( "cdmi-serve", "bind" )
+    except (NoOptionError, ValueError):
+        bind = ""
+
+    try:
+        dbtype = cfg.get( "database", "type" )
+        dbconnect = cfg.get( "database", "connect" )
+    except (NoOptionError, NoSectionError), e:
+        dbtype = "sqlite3"
+        dbconnect = ":memory:"
+        logging.warn( "using sqlite3 in :memory:" )
+
+    for s in ( signal.SIGINT, signal.SIGTERM ):
+        signal.signal( s, signalhandler )
+
+    app = serve.CDMIServer(
+            (bind, port),
+            serve.CDMIRequestHandler,
+            io.IO( root ),
+            meta.Meta( dbtype, dbconnect )
+        )
+    app.debug = options.debug
+    logging.info( "serving %s and listening on %d", root, app.server_port )
+    try:
+        app.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    except selecterror, e:
+        errno, error = e
+        if errno != 4:
+            raise
+
+if __name__ == "__main__":
+    main()
+
+# vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:
+

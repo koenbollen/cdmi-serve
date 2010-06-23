@@ -1,11 +1,9 @@
 # Koen Bollen <meneer koenbollen nl>
 # 2010 GPL
-#
 
-import sys
 import cPickle as pickle
 import threading
-
+import logging
 
 class Meta( object ):
 
@@ -18,9 +16,9 @@ class Meta( object ):
         try:
             self.dba = __import__( dbtype )
         except ImportError:
-            print >>sys.stderr, "unable to load %r, please install" % dbtype
-        self.dbc = self.dba.connect( dbconnect )
-        if self.debug: print "meta: connected"
+            logging.critical( "unable to load %r, please install" % dbtype )
+        self.dbc = self.dba.connect( dbconnect, check_same_thread=False )
+        if self.debug: logging.debug( "meta: connected" )
 
         c = self.dbc.cursor()
 
@@ -36,7 +34,7 @@ class Meta( object ):
         self.lock.acquire()
 
         if self.debug:
-            print "meta.py: sql: %r"%sql
+            logging.debug( "meta.py: sql: %r", sql )
 
         c = self.dbc.cursor()
         if args is None:

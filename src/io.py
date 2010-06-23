@@ -1,6 +1,5 @@
 # Koen Bollen <meneer koenbollen nl>
 # 2010 GPL
-#
 
 import os
 from functools import wraps
