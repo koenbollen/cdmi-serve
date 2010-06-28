@@ -62,6 +62,7 @@ def main():
             logging.getLogger().addHandler( logging.StreamHandler() )
     else:
         logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+
     logging.debug( "read config: %s", ", ".join( read ) )
 
     if len(args) > 0:

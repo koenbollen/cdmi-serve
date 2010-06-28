@@ -51,7 +51,7 @@ class IO( object ):
         return "/.".join( os.path.split( path ) )
 
     def parent(self, path ):
-        return os.path.dirname( path )
+        return os.path.dirname( path.rstrip("/") )
 
     def exists(self, path ):
         return os.path.exists( self.resolve(path) )
@@ -174,7 +174,6 @@ class IO( object ):
                 metadata = {}
             else:
                 metadata = pickle.load( fp )
-                print "read md:",metadata
                 fp.close()
             if data is not None:
                 metadata.update( data )
@@ -183,7 +182,6 @@ class IO( object ):
 
         if data is not None:
             fp = open( metafile, "wb" )
-            print "wrote md:",metadata
             pickle.dump( metadata, fp, -1 )
             fp.close()
 

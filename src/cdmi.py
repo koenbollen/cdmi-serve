@@ -12,6 +12,7 @@ try:
 except ImportError:
     import simplejson as json
 
+import capabilities
 import util
 
 httpstatuscodes = [
@@ -128,13 +129,15 @@ class Request( object ):
                 raise ProtocolError( "incorrect cdmi version", spec )
 
             try:
-                accept = h['Accept']
                 contenttype = h['Content-Type']
+                accept = h['Accept']
             except KeyError, e:
                 # One exception, a GET request without a type:
                 if not (e.args[0].lower() == "accept" and self.method=="get"):
                     raise ProtocolError( "missing header", str(e) )
                 accept = None
+
+            # TODO: if(accept==None): check path for ex. cdmi_capabilities
 
             for objecttype, mime in mimetypes.items():
                 if accept == contenttype == mime:
@@ -526,8 +529,6 @@ class Handler( object ):
                 httpcode = 404
             raise OperationError( httpcode, "unable to unlink file", e );
 
-        self.meta.delete( util.objectid( self.request.path ) )
-
         return ( (200,), None )
 
     def cdmimetadata(self ):
@@ -545,6 +546,46 @@ class Handler( object ):
         return result
 
 
+    def get_capabilities(self ):
+        path = self.request.path.lower()
+
+        if not path.startswith( "/cdmi_capabilities" ):
+            raise OperationError( 400, "invalid capability path" )
+
+        real = "/"+path[18:].strip("/")
+
+        if not real in capabilities.paths:
+            raise OperationError( 404, "capability path not found" )
+
+        reply = {
+                'objectURI': path,
+                'objectID': util.objectid( path ),
+                'parentURI': self.io.parent( path ),
+                'capabilities': capabilities.paths[real],
+            }
+
+        # quickfix for children, if the capabilities.py
+        # changes this should too:
+        if real == "/":
+            reply.update({
+                    'childrenrange': "0-1",
+                    'children': [
+                            "dataobject/",
+                            "container/",
+                        ]
+                })
+        else:
+            reply.update({
+                    'childrenrange': "",
+                    'children': []
+                })
+
+        fields = self.request.fields
+        if len(fields) > 0:
+            for key in reply.keys():
+                if key not in fields:
+                    del reply[key]
+        return ( (200,), reply )
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=79:
 

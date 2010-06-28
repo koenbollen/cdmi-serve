@@ -55,6 +55,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
     def cdmi_handle(self ):
 
         # This suppose to speed things up:
+        debug = self.server.debug
         io = self.server.io
         iscdmi = self.request.cdmi
         method = self.request.method
@@ -76,7 +77,6 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                 return self.send_error( 404 )
             self.request.objecttype = objecttype = io.objecttype( path)
 
-
         assert objecttype != "unknown"
 
         # Loose checks:
@@ -95,7 +95,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
             except cdmi.ProtocolError, e:
                 return self.send_error( 400, e )
 
-        if self.server.debug:
+        if debug:
             if "x-debug-sleep" in headers:
                 try:
                     from time import sleep
@@ -106,6 +106,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
         handler = cdmi.Handler( self.request, io )
         try:
             mname = method+"_"+objecttype
+            logging.debug( "deploying request to cdmi.Handler.%s", mname )
             mthd = getattr( handler, mname )
         except AttributeError, e:
             return self.send_error(
@@ -143,7 +144,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                     nbytes += len( chunk )
                 fp.close()
             else:
-                data = json.dumps( res[1] ).strip() + "\r\n"
+                data = json.dumps( res[1], indent=debug and 2 or None ).strip() + "\r\n"
                 self.send_response( *res[0] )
                 self.send_default_headers()
                 if iscdmi:
