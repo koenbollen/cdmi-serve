@@ -170,7 +170,6 @@ class Request( object ):
                 if v:
                     v = v.strip()
                 self.fields[k.strip().lower()] = v
-
         self.__parsed = True
 
     def __repr__(self ):
@@ -251,10 +250,9 @@ class Request( object ):
 
 class Handler( object ):
 
-    def __init__(self, request, io, meta ):
+    def __init__(self, request, io ):
         self.request = request
         self.io = io
-        self.meta = meta
         self.target = io.buildtarget( self.request.path )
 
     def put_container(self ):
@@ -288,12 +286,6 @@ class Handler( object ):
                     httpcode = 404
                 raise OperationError( httpcode, "unable to create directory", e );
 
-            try:
-                _, metadata = self.meta.get( util.objectid(source) )
-                self.meta.set( objectid, metadata )
-            except KeyError:
-                pass
-
         else:
             try:
                 target.mkdir()
@@ -309,8 +301,10 @@ class Handler( object ):
             for key in userdata.keys():
                 if key.startswith( "cdmi_" ):
                     del userdata[key]
-            metadata.update( userdata )
-            _, metadata = self.meta.update( objectid, metadata )
+            metadata = target.meta( userdata )
+        else:
+            metadata = target.meta()
+        metadata.update( self.cdmimetadata() )
 
         reply = None
         if self.request.cdmi:
@@ -350,11 +344,7 @@ class Handler( object ):
             children = children[s:e]
         objectid = util.objectid( self.request.path )
 
-        try:
-            _, metadata = self.meta.get( objectid )
-        except KeyError:
-            metadata = {}
-
+        metadata = target.meta()
         metadata.update( self.cdmimetadata() )
 
         reply = {
@@ -384,8 +374,6 @@ class Handler( object ):
             if e.errno == 39: # Directory not empty
                 httpcode = 409
             raise OperationError( httpcode, "unable to remove directory", e );
-
-        self.meta.delete( util.objectid( self.request.path ) )
 
         return ( (200,), None )
 
@@ -442,25 +430,19 @@ class Handler( object ):
                     httpcode = 404
                 raise OperationError( httpcode, "unable to create directory", e );
 
-            try:
-                mimetype, metadata = self.meta.get( util.objectid(source) )
-                self.meta.set( objectid, mimetype, metadata )
-            except KeyError:
-                pass
-
         elif stype in ("copy","reference"):
             raise OperationError( 501, "not yet implemented", stype)
 
         # save user metadata:
-        metadata = {}
-        mimetype = None
-        if json and ("metadata" in json or "mimetype" in json):
-            mimetype = json.get( "mimetype", None )
+        metadata = target.meta()
+        if json and "metadata" in json:
             metadata = json['metadata']
             for key in metadata.keys():
                 if key.startswith( "cdmi_" ):
                     del metadata[key]
-            mimetype, metadata = self.meta.update(objectid, mimetype, metadata)
+            metadata = target.meta( metadata )
+        mimetype = target.mime()
+        metadata.update( self.cdmimetadata() )
 
         reply = None
         if self.request.cdmi:
@@ -468,7 +450,7 @@ class Handler( object ):
                     'objectID': objectid,
                     'objectURI': self.request.path,
                     'parentURI': target.parent(),
-                    'mimetype': mimetype,
+                    'mimetype': target.mime(),
                     'metadata': metadata,
                     'completionStatus': "Complete",
                 }
@@ -509,14 +491,8 @@ class Handler( object ):
             objectid = util.objectid( self.request.path )
             value = target.read( length, offset )
 
-            try:
-                mimetype, metadata = self.meta.update( objectid,
-                        { 'cdmi_atime': datetime.now().isoformat() },
-                        nocreate=True
-                    )
-            except KeyError:
-                mimetype = "application/octet-stream"
-                metadata = {}
+            mimetype = target.mime()
+            metadata = target.meta()
             metadata.update( self.cdmimetadata() )
 
             reply = {

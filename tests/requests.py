@@ -60,7 +60,7 @@ def main():
             data = data.replace( "\r", "" ).replace( "\n", "\r\n" )
             headers['Content-Length'] = len(data)
 
-        s = socket.create_connection( ('localhost', 2364) )
+        s = socket.create_connection( (os.getenv( "CDMIHOST", "localhost" ), 2364) )
         line = "%s %s HTTP/1.1\r\n" % ( req['method'], req['path'] )
         if verbose: print ">", line,
         s.send( line )

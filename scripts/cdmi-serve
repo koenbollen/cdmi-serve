@@ -6,7 +6,6 @@ from ConfigParser import SafeConfigParser, NoOptionError, NoSectionError
 from select import error as selecterror
 import io
 import logging
-import meta
 import optparse
 import os
 import serve
@@ -81,14 +80,6 @@ def main():
     except (NoOptionError, ValueError):
         bind = ""
 
-    try:
-        dbtype = cfg.get( "database", "type" )
-        dbconnect = cfg.get( "database", "connect" )
-    except (NoOptionError, NoSectionError), e:
-        dbtype = "sqlite3"
-        dbconnect = ":memory:"
-        logging.warn( "using sqlite3 in :memory:" )
-
     for s in ( signal.SIGINT, signal.SIGTERM ):
         signal.signal( s, signalhandler )
 
@@ -96,7 +87,6 @@ def main():
             (bind, port),
             serve.CDMIRequestHandler,
             io.IO( root ),
-            meta.Meta( dbtype, dbconnect )
         )
     app.debug = options.debug
     logging.info( "serving %s and listening on %d", root, app.server_port )

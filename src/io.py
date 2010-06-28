@@ -5,6 +5,12 @@ import os
 from functools import wraps
 import threading
 
+import mimetypes
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 DEFAULT_BUFSIZE = 64*1024
 
 class IO( object ):
@@ -14,6 +20,9 @@ class IO( object ):
         self.bufsize = bufsize
 
         self.locks = {}
+
+        if not mimetypes.inited:
+            mimetypes.init( mimetypes.knownfiles )
 
     def __acquire(self, path ):
         #print "acquiring lock:", path
@@ -33,6 +42,13 @@ class IO( object ):
     def resolve(self, path ):
         path = path.replace("\\","/").lstrip("/")
         return os.path.join( self.root, path )
+
+    def metafile(self, path ):
+        path = self.resolve(path)
+        path = os.path.normpath( path )
+        if path == "/":
+            return "/.ROOT"
+        return "/.".join( os.path.split( path ) )
 
     def parent(self, path ):
         return os.path.dirname( path )
@@ -55,12 +71,14 @@ class IO( object ):
         return os.mkdir( self.resolve( path ) )
 
     def rmdir(self, path ):
+        os.unlink( self.metafile( path ) )
         return os.rmdir( self.resolve( path ) )
 
     def rename( self, path, source ):
         self.__acquire( source )
         self.__acquire( path )
         result = os.rename( self.resolve(source), self.resolve(path) )
+        result = os.rename( self.metafile(source), self.metafile(path) )
         self.__release( path )
         self.__release( source )
         return result
@@ -122,8 +140,56 @@ class IO( object ):
     def unlink(self, path ):
         self.__acquire( path )
         res = os.unlink( self.resolve( path ) )
+        os.unlink( self.metafile(path) )
         self.__release( path )
         return res
+
+    def mime(self, path ):
+        self.__acquire( path )
+        res = mimetypes.guess_type( self.resolve(path) )
+        try:
+            type, enc = res
+        except ValueError:
+            type = res
+        if not type:
+            type = "application/octet-stream"
+        self.__release( path )
+        return type
+
+    def meta(self, path, data=None, overwrite=False ):
+        self.__acquire( path )
+
+        metafile = self.metafile(path)
+
+        if data is None and overwrite:
+            os.unlink( metafile )
+            return {}
+
+        if not overwrite:
+            try:
+                fp = open( metafile, "rb" )
+            except IOError, (errno, errstr):
+                if errno != 2:
+                    raise
+                metadata = {}
+            else:
+                metadata = pickle.load( fp )
+                print "read md:",metadata
+                fp.close()
+            if data is not None:
+                metadata.update( data )
+        elif data is not None:
+            metadata = data
+
+        if data is not None:
+            fp = open( metafile, "wb" )
+            print "wrote md:",metadata
+            pickle.dump( metadata, fp, -1 )
+            fp.close()
+
+        self.__release( path )
+        return metadata
+
 
 
 class _ControlledFile( file ):

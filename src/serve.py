@@ -16,10 +16,9 @@ class CDMIServer( ThreadingMixIn, HTTPServer ):
     debug = False
     allow_reuse_address = True
 
-    def __init__(self, address, handler, io, meta ):
+    def __init__(self, address, handler, io ):
         HTTPServer.__init__(self, address, handler )
         self.io = io
-        self.meta = meta
 
     def close(self ):
         logging.info( "quit" )
@@ -104,7 +103,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                 except ValueError:
                     pass
 
-        handler = cdmi.Handler( self.request, io, self.server.meta )
+        handler = cdmi.Handler( self.request, io )
         try:
             mname = method+"_"+objecttype
             mthd = getattr( handler, mname )
