@@ -1,4 +1,15 @@
 ---
+- description: List system-wide capabilities.
+  command:
+    name: caps
+    args: []
+  method: GET
+  path: /cdmi_capabilities/
+  headers:
+    Content-Type: application/vnd.org.snia.cdmi.capabilities+json
+    X-CDMI-Specification-Version: 1.0
+  response: 200
+
 - description: Create a Container (CDMI Content Type)
   method: PUT
   path: /mydata
@@ -16,6 +27,9 @@
   response: 201
 
 - description: Move a Container (CDMI Content Type)
+  command:
+    name: mvdir
+    args: [ path ]
   method: PUT
   path: /mydata_newpath
   headers:
@@ -29,11 +43,17 @@
   response: 201
 
 - description: Create a Container (Non-CDMI Content Type)
+  command:
+    name: mkdir
+    args: [ path ]
   method: PUT
   path: /mydata
   response: 201
 
 - description: Read a Container Object (CDMI Content Type)
+  command:
+    name: ls
+    args: [ path ]
   method: GET
   path: /mydata
   headers:
@@ -73,6 +93,9 @@
   response: 200
 
 - description: Delete a Container Object (CDMI Content Type)
+  command:
+    name: rmdir
+    args: [ path ]
   method: DELETE
   path: /mydata
   headers:
@@ -86,30 +109,6 @@
   path: /mydata
   response: 200
 
-- description: Create a New Data Object (CDMI Content Type)
-  method: POST
-  path: /mydata/
-  headers:
-    Accept: application/vnd.org.snia.cdmi.dataobject+json
-    Content-Type: application/vnd.org.snia.cdmi.dataobject+json
-    X-CDMI-Specification-Version: 1.0
-  data: |
-    {
-        "mimetype" : "text/plain",
-        "metadata" : {
-        },
-        "value" : "The cake is a lie!"
-    }
-  response: 201
-
-- description: Create a New Data Object (Non-CDMI Content Type)
-  method: POST
-  path: /mydata/
-  headers:
-    Content-Type: text/plain
-    Content-Length: 15
-  data: Koen was hier!!
-  response: 201
 
 
 - description: Create a Data Object (CDMI Content Type)
@@ -130,6 +129,9 @@
   response: 201
 
 - description: Create a Data Object (Non-CDMI Content Type)
+  command:
+    name: write
+    args: [ path, data ]
   method: PUT
   path: /mydata/hello.txt
   headers:
@@ -139,6 +141,9 @@
   response: 201
 
 - description: Move a Data Object (CDMI Content Type)
+  command:
+    name: mv
+    args: [ path ]
   method: PUT
   path: /mydata/hello-again.txt
   headers:
@@ -173,6 +178,9 @@
   response: 200
 
 - description: Read a Data Object (Non-CDMI Content Type)
+  command:
+    name: read
+    args: [ path ]
   method: GET
   path: /mydata/hello.txt
   response: 200
@@ -226,6 +234,9 @@
   response: 201
 
 - description: Delete a Data Object (CDMI Content Type)
+  command:
+    name: rm
+    args: [ path ]
   method: DELETE
   path: /mydata/hello.txt
   headers:

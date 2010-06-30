@@ -12,6 +12,7 @@ try:
 except ImportError:
     import simplejson as json
 
+from io import METAFILE_PREFIX
 import capabilities
 import util
 
@@ -46,11 +47,16 @@ httpstatuscodes = [
 ]
 
 mimetypes = {
+
+    # This one is in the Common Operations example in the documentation:
+    'capabilities': "application/vnd.org.snia.cdmi.capabilitiesobject+json",
+
     'object':       "application/vnd.org.snia.cdmi.object+json",
     'container':    "application/vnd.org.snia.cdmi.container+json",
     'dataobject':   "application/vnd.org.snia.cdmi.dataobject+json",
     'domain':       "application/vnd.org.snia.cdmi.domain+json",
     'queue':        "application/vnd.org.snia.cdmi.queue+json",
+
     'capabilities': "application/vnd.org.snia.cdmi.capabilities+json",
 }
 
@@ -137,8 +143,6 @@ class Request( object ):
                     raise ProtocolError( "missing header", str(e) )
                 accept = None
 
-            # TODO: if(accept==None): check path for ex. cdmi_capabilities
-
             for objecttype, mime in mimetypes.items():
                 if accept == contenttype == mime:
                     self.objecttype = objecttype
@@ -148,6 +152,10 @@ class Request( object ):
                     break
             if self.objecttype == "object":
                 self.objecttype = "unknown"
+
+            if accept == None and self.objecttype == "unknown":
+                if self.path.lower().startswith("/cdmi_capabilities"):
+                    self.objecttype = "capabilities"
 
             self.accept = accept
             self.contenttype = contenttype
@@ -165,6 +173,8 @@ class Request( object ):
 
         # Separate fields from the path:
         p = self.path
+        if os.path.basename( p ).startswith(METAFILE_PREFIX):
+            raise ProtocolError( "direct use of a metafile" )
         self.fields = {}
         if "?" in self.path:
             self.path, fstr = self.path.split( "?", 1 )

@@ -12,6 +12,7 @@ except ImportError:
     import pickle
 
 DEFAULT_BUFSIZE = 64*1024
+METAFILE_PREFIX = ".metafile-"
 
 class IO( object ):
 
@@ -44,11 +45,11 @@ class IO( object ):
         return os.path.join( self.root, path )
 
     def metafile(self, path ):
-        path = self.resolve(path)
         path = os.path.normpath( path )
+        sep = "/"+METAFILE_PREFIX
         if path == "/":
-            return "/.ROOT"
-        return "/.".join( os.path.split( path ) )
+            return self.resolve( sep+"ROOT" )
+        return self.resolve( sep.join( os.path.split( path ) ) )
 
     def parent(self, path ):
         return os.path.dirname( path.rstrip("/") )
@@ -86,6 +87,7 @@ class IO( object ):
     def list(self, path ):
         path = self.resolve( path )
         ls = os.listdir( path )
+        ls = filter( lambda x: not x.startswith( METAFILE_PREFIX ), ls )
         for i,e in enumerate(ls):
             if os.path.isdir( os.path.join( path, e ) ):
                 ls[i] += "/"
