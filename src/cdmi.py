@@ -441,7 +441,7 @@ class Handler( object ):
                 httpcode = 500
                 if e.errno == 2:
                     httpcode = 404
-                raise OperationError( httpcode, "unable to create directory", e );
+                raise OperationError( httpcode, "unable to create file", e );
 
         elif stype in ("copy","reference"):
             raise OperationError( 501, "not yet implemented", stype)
@@ -491,14 +491,18 @@ class Handler( object ):
             if s is None or s < 0:
                 s = 0
             offset = s
-            if e is not None:
-                length = min( length, e-s )
-            else:
+            if e is None:
                 e = length
+            length = min( length, e-s )
         else:
             s = 0
             e = length
         rangestr = "%d-%d" % (s, e-1) # protocol speaks inclusive
+
+        if offset is not None:
+            length = min(length, stat.st_size - offset)
+        else:
+            length = min(length, stat.st_size)
 
         if self.request.cdmi or len(fields) > 0:
             objectid = util.objectid( self.request.path )

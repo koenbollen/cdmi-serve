@@ -72,17 +72,27 @@ class IO( object ):
         return os.mkdir( self.resolve( path ) )
 
     def rmdir(self, path ):
-        os.unlink( self.metafile( path ) )
+        try:
+            os.unlink( self.metafile( path ) )
+        except OSError, (errno, errstr):
+            if errno != 2:
+                raise
         return os.rmdir( self.resolve( path ) )
 
     def rename( self, path, source ):
         self.__acquire( source )
         self.__acquire( path )
-        result = os.rename( self.resolve(source), self.resolve(path) )
-        result = os.rename( self.metafile(source), self.metafile(path) )
-        self.__release( path )
-        self.__release( source )
-        return result
+        try:
+            result = os.rename( self.resolve(source), self.resolve(path) )
+            try:
+                os.rename( self.metafile(source), self.metafile(path) )
+            except OSError, (errno, errstr):
+                if errno != 2:
+                    raise
+            return result
+        finally:
+            self.__release( path )
+            self.__release( source )
 
     def list(self, path ):
         path = self.resolve( path )
@@ -100,40 +110,56 @@ class IO( object ):
             mode = "wb"
         else:
             mode = "r+b"
-        out = open( self.resolve( path ), mode, self.bufsize )
-        out.seek(0, os.SEEK_SET)
-        if offset:
-            out.seek( offset, os.SEEK_SET )
+        try:
+            out = open( self.resolve( path ), mode, self.bufsize )
+            out.seek(0, os.SEEK_SET)
+            if offset:
+                out.seek( offset, os.SEEK_SET )
 
-        nbytes = 0
-        while nbytes < length:
-            chunk = fp.read( min( length-nbytes, self.bufsize ) )
-            if not chunk:
-                break
-            out.write( chunk )
-            nbytes += len(chunk)
+            nbytes = 0
+            while nbytes < length:
+                chunk = fp.read( min( length-nbytes, self.bufsize ) )
+                if not chunk:
+                    break
+                out.write( chunk )
+                nbytes += len(chunk)
 
-        out.close()
-        self.__release( path )
-        return nbytes
+            out.close()
+            return nbytes
+        finally:
+            self.__release( path )
 
     def read(self, path, length, offset=None ):
         self.__acquire( path )
-        f = open( self.resolve(path), "rb", self.bufsize )
+
+        s = self.stat( path )
+        size = s.st_size
+        if offset is not None:
+            length = min(length, size - offset)
+        else:
+            length = min(length, size)
+
         try:
-            if offset:
-                f.seek( offset, os.SEEK_SET )
-            value = f.read( length )
+            f = open( self.resolve(path), "rb", self.bufsize )
+            try:
+                if offset:
+                    f.seek( offset, os.SEEK_SET )
+                value = f.read( length )
+            finally:
+                f.close()
+            return value
         finally:
-            f.close()
-        self.__release( path )
-        return value
+            self.__release( path )
 
     def open(self, path, mode="rb" ):
         self.__acquire( path )
-        fp = _ControlledFile( self.resolve(path), mode, self.bufsize )
-        fp.io = self
-        fp.path = path
+        try:
+            fp = _ControlledFile( self.resolve(path), mode, self.bufsize )
+            fp.io = self
+            fp.path = path
+        except:
+            self.__release( path )
+            raise
         return fp
 
     def close(self, path ):
@@ -141,54 +167,64 @@ class IO( object ):
 
     def unlink(self, path ):
         self.__acquire( path )
-        res = os.unlink( self.resolve( path ) )
-        os.unlink( self.metafile(path) )
-        self.__release( path )
-        return res
+        try:
+            res = os.unlink( self.resolve( path ) )
+            try:
+                os.unlink( self.metafile( path ) )
+            except OSError, (errno, errstr):
+                if errno != 2:
+                    raise
+            return res
+        finally:
+            self.__release( path )
 
     def mime(self, path ):
         self.__acquire( path )
-        res = mimetypes.guess_type( self.resolve(path) )
         try:
-            type, enc = res
-        except ValueError:
-            type = res
-        if not type:
-            type = "application/octet-stream"
-        self.__release( path )
-        return type
+            res = mimetypes.guess_type( self.resolve(path) )
+            try:
+                type, enc = res
+            except ValueError:
+                type = res
+            if not type:
+                type = "application/octet-stream"
+            return type
+        finally:
+            self.__release( path )
 
     def meta(self, path, data=None, overwrite=False ):
         self.__acquire( path )
 
-        metafile = self.metafile(path)
+        try:
+            metafile = self.metafile(path)
 
-        if data is None and overwrite:
-            os.unlink( metafile )
-            return {}
+            if data is None and overwrite:
+                os.unlink( metafile )
+                return {}
 
-        if not overwrite:
-            try:
-                fp = open( metafile, "rb" )
-            except IOError, (errno, errstr):
-                if errno != 2:
-                    raise
-                metadata = {}
-            else:
-                metadata = pickle.load( fp )
-                fp.close()
+            if not overwrite:
+                try:
+                    fp = open( metafile, "rb" )
+                except IOError, (errno, errstr):
+                    if errno != 2:
+                        raise
+                    metadata = {}
+                else:
+                    metadata = pickle.load( fp )
+                    fp.close()
+                if data is not None:
+                    metadata.update( data )
+            elif data is not None:
+                metadata = data
+
             if data is not None:
-                metadata.update( data )
-        elif data is not None:
-            metadata = data
+                fp = open( metafile, "wb" )
+                pickle.dump( metadata, fp, -1 )
+                fp.close()
 
-        if data is not None:
-            fp = open( metafile, "wb" )
-            pickle.dump( metadata, fp, -1 )
-            fp.close()
-
-        self.__release( path )
-        return metadata
+            return metadata
+        finally:
+            self.__release( path )
 
 
 
