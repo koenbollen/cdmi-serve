@@ -4,7 +4,7 @@
 
 from ConfigParser import SafeConfigParser, NoOptionError, NoSectionError
 from select import error as selecterror
-import logging
+import logging, logging.config
 import optparse
 import os
 from cdmiserve import serve, io
