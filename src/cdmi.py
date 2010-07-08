@@ -248,6 +248,9 @@ class Request( object ):
 
         if rangestr:
             self.range = util.byterange( rangestr )
+            if self.range[1] and self.range[1] < self.range[0]:
+                raise ProtocolError( "invalid byte range", rangestr )
+
 
     def container(self ):
         if "children" in self.fields and self.fields['children'] is not None:
@@ -500,6 +503,8 @@ class Handler( object ):
         rangestr = "%d-%d" % (s, e-1) # protocol speaks inclusive
 
         if offset is not None:
+            if offset > stat.st_size:
+                offset = stat.st_size
             length = min(length, stat.st_size - offset)
         else:
             length = min(length, stat.st_size)

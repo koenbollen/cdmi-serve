@@ -130,7 +130,7 @@ class CDMIRequestHandler( BaseHTTPRequestHandler ):
                 self.send_default_headers()
                 self.send_header( "Content-Type", contenttype )
                 self.send_header( "Content-Length", length )
-                if self.request.range is not None:
+                if self.request.range is not None and length > 0:
                     rangestr = "bytes=%d-%d" % ( offset, offset+length-1 )
                     self.send_header( "Content-Range", rangestr )
                 self.end_headers()

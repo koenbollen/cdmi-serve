@@ -24,6 +24,7 @@ system = {
         "atime": True,
         "mtime": True,
         "hash": False, # not yet
+        "acl": False,
     }
 
 dataobject = {

@@ -135,6 +135,8 @@ class IO( object ):
         s = self.stat( path )
         size = s.st_size
         if offset is not None:
+            if offset > size:
+                offset = size
             length = min(length, size - offset)
         else:
             length = min(length, size)
