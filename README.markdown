@@ -19,7 +19,7 @@ To run the server execute the following commands:
     $ git clone git://github.com/koenbollen/cdmi-serve.git
     $ cd cdmi-serve
     $ mkdir data
-    $ python src/serve.py
+    $ python scripts/cdmi-serve data/
 
 
 
